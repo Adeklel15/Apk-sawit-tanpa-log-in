@@ -1,0 +1,19 @@
+{
+  "name": "Sawit-Ku - Abdul Jalil",
+  "short_name": "Sawit-Ku",
+  "description": "Pencatatan Panen, Perawatan, Simulasi 3D dan Neraca Keuangan Kebun Kelapa Sawit",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F3F7F4",
+  "theme_color": "#2D5A27",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

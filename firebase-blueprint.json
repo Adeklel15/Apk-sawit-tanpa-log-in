@@ -1,0 +1,163 @@
+{
+  "entities": {
+    "LaporanPanen": {
+      "title": "Laporan Panen",
+      "description": "Catatan hasil panen TBS kelapa sawit per siklus 2 minggu",
+      "type": "object",
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "description": "Waktu catatan dibuat"
+        },
+        "createdMillis": {
+          "type": "number",
+          "description": "Milidetik pembuatan waktu server/lokal"
+        },
+        "dayName": {
+          "type": "string"
+        },
+        "dayDate": {
+          "type": "number"
+        },
+        "monthName": {
+          "type": "string"
+        },
+        "year": {
+          "type": "number"
+        },
+        "jjg": {
+          "type": "number",
+          "description": "Jumlah janjang"
+        },
+        "totalKg": {
+          "type": "number",
+          "description": "Total berat timbangan (kg)"
+        },
+        "hilangJjg": {
+          "type": "number",
+          "description": "Estimasi janjang hilang"
+        },
+        "hargaPerKg": {
+          "type": "number",
+          "description": "Harga sawit per kg"
+        },
+        "ongkosPerKg": {
+          "type": "number",
+          "description": "Ongkos panen per kg"
+        },
+        "kotor": {
+          "type": "number",
+          "description": "Pendapatan kotor (Rp)"
+        },
+        "ongkos": {
+          "type": "number",
+          "description": "Total ongkos panen (Rp)"
+        },
+        "bersih": {
+          "type": "number",
+          "description": "Uang bersih setelah upah panen (Rp)"
+        },
+        "bjr": {
+          "type": "string",
+          "description": "Berat Janjang Rata-rata"
+        },
+        "localId": {
+          "type": "string"
+        }
+      },
+      "required": ["jjg", "totalKg", "hargaPerKg"]
+    },
+    "LaporanPupuk": {
+      "title": "Laporan Pupuk dan Perawatan",
+      "description": "Pencatatan dosis pupuk dan biaya perawatan/herbisida",
+      "type": "object",
+      "properties": {
+        "timestamp": {
+          "type": "string"
+        },
+        "createdMillis": {
+          "type": "number"
+        },
+        "dayName": {
+          "type": "string"
+        },
+        "dayDate": {
+          "type": "number"
+        },
+        "monthName": {
+          "type": "string"
+        },
+        "year": {
+          "type": "number"
+        },
+        "jenis": {
+          "type": "string"
+        },
+        "dosisPohon": {
+          "type": "number"
+        },
+        "totalLiterHerbisida": {
+          "type": "number"
+        },
+        "totalPohon": {
+          "type": "number"
+        },
+        "biayaBahan": {
+          "type": "number"
+        },
+        "biayaKerja": {
+          "type": "number"
+        },
+        "totalBiayaRawat": {
+          "type": "number"
+        },
+        "localId": {
+          "type": "string"
+        }
+      },
+      "required": ["jenis", "totalBiayaRawat"]
+    },
+    "ProfileInfo": {
+      "title": "Profil Pengguna",
+      "description": "Data profil pemilik kebun dan populasi pohon",
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "type": "string"
+        },
+        "totalPohon": {
+          "type": "number"
+        },
+        "photoUrl": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/artifacts/{appId}/users/{userId}/laporan_panen/{reportId}": {
+      "schema": {
+        "$ref": "#/entities/LaporanPanen"
+      },
+      "description": "Koleksi catatan panen 2-mingguan milik pengguna"
+    },
+    "/artifacts/{appId}/users/{userId}/laporan_pupuk/{reportId}": {
+      "schema": {
+        "$ref": "#/entities/LaporanPupuk"
+      },
+      "description": "Koleksi catatan pemupukan dan herbisida milik pengguna"
+    },
+    "/artifacts/{appId}/users/{userId}/profile/info": {
+      "schema": {
+        "$ref": "#/entities/ProfileInfo"
+      },
+      "description": "Informasi profil dan pengaturan populasi kebun milik pengguna"
+    }
+  }
+}

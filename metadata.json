@@ -1,0 +1,10 @@
+{
+  "name": "Sawit-Ku - Abdul Jalil",
+  "description": "Aplikasi manajemen kebun kelapa sawit terpadu: pencatatan panen 2-mingguan, pemupukan & herbisida, simulasi lab 3D, neraca laba bersih, analisis BJR, deteksi kehilangan TBS, dan PWA offline-first.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

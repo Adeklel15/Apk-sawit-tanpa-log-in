@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Akses data petani: Diizinkan per userId tanpa memerlukan login password / Google
+    match /artifacts/{appId}/users/{userId}/{document=**} {
+      allow read, write: if true;
+    }
+
+    // Proteksi default: Tolak semua akses ke dokumen di luar cakupan
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

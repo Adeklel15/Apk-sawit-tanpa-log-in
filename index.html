@@ -1,0 +1,2784 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#2D5A27">
+    <meta name="description" content="Sawit-Ku: Aplikasi profesional manajemen kebun kelapa sawit karya Abdul Jalil. Pencatatan panen 2-mingguan, pemupukan, herbisida, neraca keuangan, dan simulasi 3D.">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <title>Sawit-Ku - Abdul Jalil</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Three.js Library for 3D Rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Chart.js for Monthly Financial Trends -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sageBg: '#F3F7F4',
+                        sageCard: '#FFFFFF',
+                        sagePrimary: '#2D5A27',
+                        sageHover: '#23471F',
+                        sageLight: '#E8F2E8',
+                        sageAccent: '#487E42',
+                        emeraldSoft: '#D1E7DD',
+                        charcoal: '#2D3748',
+                        softBorder: '#E2E8F0',
+                        kotorBg: '#E8F5E9',
+                        kotorText: '#1B5E20',
+                        panenBg: '#FFEBEE',
+                        panenText: '#C62828',
+                        rawatBg: '#FFF3E0',
+                        rawatText: '#E65100',
+                        bersihBg: '#C8E6C9',
+                        bersihText: '#1B5E20'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #F3F7F4;
+            color: #2D3748;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            user-select: none;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .hidden { display: none !important; }
+
+        /* Smooth Page Transition Animation */
+        .page-view {
+            transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: opacity, transform;
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        .page-hidden {
+            opacity: 0 !important;
+            pointer-events: none !important;
+            transform: translateY(12px) scale(0.985) !important;
+            position: absolute !important;
+            width: 100% !important;
+            top: 0 !important;
+            left: 0 !important;
+            visibility: hidden !important;
+        }
+
+        /* Modal Backdrop & Card Animations */
+        .modal-fade-enter {
+            animation: modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .modal-card-enter {
+            animation: modalCardPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes modalCardPop {
+            from { opacity: 0; transform: scale(0.92) translateY(12px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        /* Compact Attractive Toast Notification Animations */
+        #toast.toast-show {
+            transform: translateY(0) scale(1) !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+        #toast.toast-hide {
+            transform: translateY(-20px) scale(0.9) !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        /* Interactive Tactile Micro-Interactions */
+        button, a, input[type=submit] {
+            touch-action: manipulation;
+        }
+        button:active:not(:disabled) {
+            transform: scale(0.975);
+            transition: transform 0.1s ease;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F3F7F4;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #A3C9A8;
+            border-radius: 4px;
+        }
+
+        #canvas3d-container {
+            width: 100%;
+            height: 260px;
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            background: linear-gradient(180deg, #E8F2E8 0%, #C8E6C9 100%);
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.06);
+            touch-action: none;
+        }
+
+        input[type=range] {
+            accent-color: #2D5A27;
+        }
+
+        @media print {
+            nav, header, button, .no-print {
+                display: none !important;
+            }
+            body {
+                background: white;
+                color: black;
+            }
+            .page-view {
+                position: static !important;
+                opacity: 1 !important;
+                transform: none !important;
+            }
+        }
+    </style>
+
+    <!-- Web Audio API Synthesizer (Efek Suara Umpan Balik) -->
+    <script>
+        window.audioMuted = localStorage.getItem('sawit_audio_muted') === 'true';
+
+        function playSound(type) {
+            if (window.audioMuted) return;
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                const now = ctx.currentTime;
+                if (type === 'success') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, now);
+                    osc.frequency.setValueAtTime(659.25, now + 0.1);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } else if (type === 'warning') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.setValueAtTime(196, now + 0.15);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+                    osc.start(now);
+                    osc.stop(now + 0.4);
+                } else if (type === 'sync') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(880, now);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                }
+            } catch (e) {
+                console.warn("AudioContext dimatikan browser:", e);
+            }
+        }
+
+        function toggleAudioMute() {
+            window.audioMuted = !window.audioMuted;
+            localStorage.setItem('sawit_audio_muted', window.audioMuted);
+            updateAudioMuteUI();
+            if (!window.audioMuted) playSound('sync');
+        }
+
+        function updateAudioMuteUI() {
+            const btns = document.querySelectorAll('.mute-toggle-btn');
+            btns.forEach(btn => {
+                if (window.audioMuted) {
+                    btn.innerHTML = `<i class="fa-solid fa-volume-xmark text-red-500"></i><span class="ml-1 hidden sm:inline">Mute</span>`;
+                } else {
+                    btn.innerHTML = `<i class="fa-solid fa-volume-high text-sagePrimary"></i><span class="ml-1 hidden sm:inline">Suara On</span>`;
+                }
+            });
+        }
+
+        function updateConnectionStatus(isOnline) {
+            const badge = document.getElementById('connection-status-badge');
+            if (!badge) return;
+            if (isOnline) {
+                badge.className = "bg-emeraldSoft text-sagePrimary text-[9px] font-bold px-2 py-0.5 rounded-full border border-emerald-300 flex items-center space-x-1";
+                badge.innerHTML = `<span class="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-ping"></span><span>Online</span>`;
+            } else {
+                badge.className = "bg-amber-100 text-amber-800 text-[9px] font-bold px-2 py-0.5 rounded-full border border-amber-300 flex items-center space-x-1";
+                badge.innerHTML = `<span class="w-1.5 h-1.5 bg-amber-600 rounded-full"></span><span>Offline (Lokal)</span>`;
+            }
+        }
+        window.updateConnectionStatus = updateConnectionStatus;
+
+        let toastTimeout = null;
+
+        function showToast(msg, type = 'success', subtitle = '') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+            const toastSub = document.getElementById('toast-sub');
+            const toastIcon = document.getElementById('toast-icon');
+            const toastIconWrap = document.getElementById('toast-icon-wrapper');
+            const toastProg = document.getElementById('toast-progress');
+            if (!toast || !toastMsg) return;
+
+            if (toastTimeout) {
+                clearTimeout(toastTimeout);
+                toastTimeout = null;
+            }
+
+            toastMsg.innerText = msg;
+
+            if (toastSub) {
+                if (subtitle) {
+                    toastSub.innerText = subtitle;
+                    toastSub.classList.remove('hidden');
+                } else {
+                    toastSub.classList.add('hidden');
+                }
+            }
+
+            if (toastIcon && toastIconWrap && toastProg) {
+                if (type === 'warning') {
+                    toastIcon.className = "fa-solid fa-triangle-exclamation";
+                    toastIconWrap.className = "w-5 h-5 rounded-md bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 text-[10px]";
+                    toastProg.className = "absolute bottom-0 left-0 h-[2px] bg-amber-400 transition-all duration-[2800ms] ease-linear w-full";
+                } else if (type === 'sync') {
+                    toastIcon.className = "fa-solid fa-arrows-rotate animate-spin";
+                    toastIconWrap.className = "w-5 h-5 rounded-md bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 text-[10px]";
+                    toastProg.className = "absolute bottom-0 left-0 h-[2px] bg-sky-400 transition-all duration-[2800ms] ease-linear w-full";
+                } else {
+                    toastIcon.className = "fa-solid fa-circle-check";
+                    toastIconWrap.className = "w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 text-[10px]";
+                    toastProg.className = "absolute bottom-0 left-0 h-[2px] bg-emerald-400 transition-all duration-[2800ms] ease-linear w-full";
+                }
+
+                toastProg.style.transition = 'none';
+                toastProg.style.width = '100%';
+                setTimeout(() => {
+                    toastProg.style.transition = 'width 2.8s linear';
+                    toastProg.style.width = '0%';
+                }, 40);
+            }
+
+            toast.classList.remove('toast-hide');
+            toast.classList.add('toast-show');
+
+            toastTimeout = setTimeout(() => {
+                dismissToast();
+            }, 3000);
+        }
+        window.showToast = showToast;
+
+        function dismissToast() {
+            const toast = document.getElementById('toast');
+            if (!toast) return;
+            toast.classList.remove('toast-show');
+            toast.classList.add('toast-hide');
+            if (toastTimeout) {
+                clearTimeout(toastTimeout);
+                toastTimeout = null;
+            }
+        }
+        window.dismissToast = dismissToast;
+    </script>
+
+    <!-- Firebase SDK Modules & Initialization -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously,
+            signInWithCustomToken, 
+            onAuthStateChanged,
+            signOut 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            setDoc, 
+            deleteDoc,
+            collection, 
+            onSnapshot, 
+            addDoc 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Pembersihan kredensial login usang
+        try { 
+            localStorage.removeItem('sawit_firebase_config'); 
+            localStorage.removeItem('sawit_registered_users');
+            localStorage.removeItem('sawit_registered_users_v2');
+        } catch (_) {}
+
+        // Konfigurasi Produksi Firebase Sawit-Ku (Aktif & Terhubung)
+        const activeFirebaseConfig = {
+            apiKey: "AIzaSyB3cdTC4HQBELp_PkMx95E3LVOPxdrMbtw",
+            authDomain: "omega-generator-4bcxw.firebaseapp.com",
+            projectId: "omega-generator-4bcxw",
+            firestoreDatabaseId: "ai-studio-sawitkuabduljali-5eb6cb74-c39d-48ab-9cc6-234ae464d09a",
+            storageBucket: "omega-generator-4bcxw.firebasestorage.app",
+            messagingSenderId: "641302379471",
+            appId: "1:641302379471:web:0ba82f94e4e073e64230ba",
+            collectionAppId: "sawit-ku-app"
+        };
+        const firebaseConfig = activeFirebaseConfig;
+        window.sawitFirebaseConfigured = true;
+        window.sawitCurrentConfig = firebaseConfig;
+        const appId = "sawit-ku-app";
+        window.appId = appId;
+
+        function getSavedPetaniBiodata() {
+            try {
+                const raw = localStorage.getItem('sawit_petani_biodata');
+                if (raw) return JSON.parse(raw);
+            } catch (_) {}
+            return null;
+        }
+        window.getSavedPetaniBiodata = getSavedPetaniBiodata;
+
+        function getOrCreateDeviceUid() {
+            let uid = localStorage.getItem('sawit_petani_device_uid');
+            if (!uid) {
+                uid = 'petani_' + (window.crypto && crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '').slice(0, 12) : Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
+                localStorage.setItem('sawit_petani_device_uid', uid);
+            }
+            return uid;
+        }
+        window.getOrCreateDeviceUid = getOrCreateDeviceUid;
+
+        function applyPetaniBiodataToUI(biodata) {
+            if (!biodata) return;
+            window.currentBiodata = biodata;
+            window.currentUser = {
+                uid: biodata.uid,
+                displayName: biodata.namaPetani || 'Petani Sawit',
+                kebun: biodata.namaKebun || 'Kebun Sawit Mandiri',
+                email: biodata.namaPetani || 'Petani Sawit-Ku'
+            };
+
+            const headerLabel = document.getElementById('header-farmer-label');
+            if (headerLabel) {
+                headerLabel.innerText = `${biodata.namaPetani} • ${biodata.namaKebun}`;
+                headerLabel.classList.remove('hidden');
+            }
+
+            const pName = document.getElementById('profile-display-name');
+            if (pName) pName.value = biodata.namaPetani || '';
+            const pKebun = document.getElementById('profile-kebun-name');
+            if (pKebun) pKebun.value = biodata.namaKebun || '';
+            const pLuas = document.getElementById('profile-luas-lahan');
+            if (pLuas) pLuas.value = (biodata.luasLahan !== undefined && biodata.luasLahan !== null) ? biodata.luasLahan : '';
+            const pPohon = document.getElementById('profile-pohon-count');
+            if (pPohon) pPohon.value = (biodata.jumlahPohon !== undefined && biodata.jumlahPohon !== null) ? biodata.jumlahPohon : '';
+            const pKontak = document.getElementById('profile-kontak-hp');
+            if (pKontak) pKontak.value = biodata.kontak || '';
+            const pUid = document.getElementById('profile-uid-text');
+            if (pUid) pUid.innerText = biodata.uid || '';
+            const pAvatar = document.getElementById('profile-avatar-img');
+            if (pAvatar && biodata.photoUrl) pAvatar.src = biodata.photoUrl;
+
+            const harvestPohon = document.getElementById('harvest-pohon-count');
+            if (harvestPohon && biodata.jumlahPohon) {
+                harvestPohon.value = biodata.jumlahPohon;
+            }
+
+            const modal = document.getElementById('biodata-modal');
+            if (modal) modal.classList.add('hidden');
+            const mainApp = document.getElementById('main-app-content');
+            if (mainApp) mainApp.classList.remove('hidden');
+        }
+        window.applyPetaniBiodataToUI = applyPetaniBiodataToUI;
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+            window.firebaseApp = app;
+            window.firebaseAuth = auth;
+            window.firebaseDb = db;
+
+            Object.assign(window, { db, auth, doc, getDoc, setDoc, deleteDoc, collection, onSnapshot, addDoc, signOut });
+
+            // Otomatisasi sesi Firebase di latar belakang (tanpa formulir login bagi petani)
+            if (navigator.onLine && auth) {
+                signInAnonymously(auth).catch(() => {});
+            }
+
+            onAuthStateChanged(auth, async (user) => {
+                const bio = getSavedPetaniBiodata();
+                if (bio) {
+                    if (user && !bio.uid) {
+                        bio.uid = user.uid;
+                        localStorage.setItem('sawit_petani_biodata', JSON.stringify(bio));
+                    }
+                    applyPetaniBiodataToUI(bio);
+                    subscribeToUserHarvestReports(bio.uid || (user ? user.uid : getOrCreateDeviceUid()));
+                    subscribeToUserFertilizerReports(bio.uid || (user ? user.uid : getOrCreateDeviceUid()));
+                    checkOfflinePendingSync();
+                }
+            });
+
+            function subscribeToUserHarvestReports(userId) {
+                try {
+                    const harvestColl = collection(db, 'artifacts', appId, 'users', userId, 'laporan_panen');
+                    onSnapshot(harvestColl, (snapshot) => {
+                        const reports = [];
+                        snapshot.forEach(docSnap => {
+                            reports.push({ id: docSnap.id, ...docSnap.data() });
+                        });
+                        window.userHarvestData = reports;
+                        if (typeof window.renderHarvestHistory === 'function') {
+                            window.renderHarvestHistory(reports);
+                        }
+                        if (typeof window.updateGlobalAnalytics === 'function') {
+                            window.updateGlobalAnalytics();
+                        }
+                    }, (err) => {
+                        console.info("Penyimpanan panen mode lokal:", err && err.message);
+                    });
+                } catch (subErr) {
+                    console.info("Berlangganan panen lokal:", subErr);
+                }
+            }
+            window.subscribeToUserHarvestReports = subscribeToUserHarvestReports;
+
+            function subscribeToUserFertilizerReports(userId) {
+                try {
+                    const fertColl = collection(db, 'artifacts', appId, 'users', userId, 'laporan_pupuk');
+                    onSnapshot(fertColl, (snapshot) => {
+                        const reports = [];
+                        snapshot.forEach(docSnap => {
+                            reports.push({ id: docSnap.id, ...docSnap.data() });
+                        });
+                        window.userFertilizerData = reports;
+                        if (typeof window.renderFertilizerHistory === 'function') {
+                            window.renderFertilizerHistory(reports);
+                        }
+                        if (typeof window.updateGlobalAnalytics === 'function') {
+                            window.updateGlobalAnalytics();
+                        }
+                    }, (err) => {
+                        console.info("Penyimpanan pupuk mode lokal:", err && err.message);
+                    });
+                } catch (subErr) {
+                    console.info("Berlangganan pupuk lokal:", subErr);
+                }
+            }
+            window.subscribeToUserFertilizerReports = subscribeToUserFertilizerReports;
+        } catch (initErr) {
+            console.warn("Inisialisasi Firebase dialihkan ke mode mandiri perangkat:", initErr);
+        }
+
+        // Simpan Formulir Setup Biodata Petani Pertama Kali
+        window.submitPetaniBiodata = async function() {
+            const namaInput = document.getElementById('setup-nama-petani');
+            const kebunInput = document.getElementById('setup-nama-kebun');
+            const luasInput = document.getElementById('setup-luas-lahan');
+            const pohonInput = document.getElementById('setup-jumlah-pohon');
+            const kontakInput = document.getElementById('setup-kontak-hp');
+
+            const namaPetani = namaInput ? namaInput.value.trim() : '';
+            const namaKebun = kebunInput ? kebunInput.value.trim() : '';
+            const luasLahan = luasInput ? Math.max(0, parseFloat(luasInput.value) || 0) : 0;
+            const jumlahPohon = pohonInput ? Math.max(0, parseInt(pohonInput.value, 10) || 0) : 0;
+            const kontak = kontakInput ? kontakInput.value.trim() : '';
+
+            if (!namaPetani) {
+                showBiodataAlert('Silakan masukkan Nama Pemilik Kebun / Petani.');
+                playSound('warning');
+                if (namaInput) namaInput.focus();
+                return;
+            }
+            if (!namaKebun) {
+                showBiodataAlert('Silakan masukkan Nama atau Lokasi Kebun Sawit.');
+                playSound('warning');
+                if (kebunInput) kebunInput.focus();
+                return;
+            }
+
+            const uid = (window.currentUser && window.currentUser.uid) || getOrCreateDeviceUid();
+            const existing = getSavedPetaniBiodata() || {};
+            const photoUrl = existing.photoUrl || 'https://placehold.co/120x120/2D5A27/FFFFFF?text=Sawit-Ku';
+
+            const biodata = {
+                uid: uid,
+                namaPetani: namaPetani,
+                namaKebun: namaKebun,
+                luasLahan: luasLahan,
+                jumlahPohon: jumlahPohon,
+                kontak: kontak,
+                photoUrl: photoUrl,
+                updatedAt: new Date().toISOString()
+            };
+
+            localStorage.setItem('sawit_petani_biodata', JSON.stringify(biodata));
+            applyPetaniBiodataToUI(biodata);
+
+            if (navigator.onLine && window.firebaseDb) {
+                try {
+                    const userDocRef = doc(window.firebaseDb, 'artifacts', window.appId, 'users', uid, 'profile', 'info');
+                    await setDoc(userDocRef, biodata, { merge: true });
+                } catch (e) {
+                    console.info("Simpan biodata cloud tersinkron lokal:", e && e.message);
+                }
+            }
+
+            if (typeof window.subscribeToUserHarvestReports === 'function') window.subscribeToUserHarvestReports(uid);
+            if (typeof window.subscribeToUserFertilizerReports === 'function') window.subscribeToUserFertilizerReports(uid);
+            if (typeof window.checkOfflinePendingSync === 'function') window.checkOfflinePendingSync();
+
+            playSound('success');
+            showToast(`Biodata kebun disimpan! Selamat datang di Sawit-Ku, ${namaPetani}.`);
+        };
+
+        // Buka Ulang Formulir Biodata
+        window.openBiodataModal = function() {
+            const bio = getSavedPetaniBiodata() || {};
+            const namaInput = document.getElementById('setup-nama-petani');
+            const kebunInput = document.getElementById('setup-nama-kebun');
+            const luasInput = document.getElementById('setup-luas-lahan');
+            const pohonInput = document.getElementById('setup-jumlah-pohon');
+            const kontakInput = document.getElementById('setup-kontak-hp');
+
+            if (namaInput) namaInput.value = bio.namaPetani || '';
+            if (kebunInput) kebunInput.value = bio.namaKebun || '';
+            if (luasInput) luasInput.value = (bio.luasLahan !== undefined && bio.luasLahan !== null) ? bio.luasLahan : '';
+            if (pohonInput) pohonInput.value = (bio.jumlahPohon !== undefined && bio.jumlahPohon !== null) ? bio.jumlahPohon : '';
+            if (kontakInput) kontakInput.value = bio.kontak || '';
+
+            const alertBox = document.getElementById('biodata-alert');
+            if (alertBox) alertBox.classList.add('hidden');
+
+            const modal = document.getElementById('biodata-modal');
+            if (modal) modal.classList.remove('hidden');
+        };
+
+        // Reset Profil Petani & Ganti Kebun
+        window.resetBiodataAndData = function() {
+            if (confirm("Atur ulang profil dan biodata kebun ini?\n\nCatatan hasil panen dan perawatan yang telah tersimpan di perangkat tetap aman.")) {
+                window.openBiodataModal();
+            }
+        };
+
+        // Ganti foto profil & info pengguna dari Halaman 5 (Profil)
+        window.saveUserProfile = async function() {
+            const uid = (window.currentUser && window.currentUser.uid) || getOrCreateDeviceUid();
+            const newName = (document.getElementById('profile-display-name')?.value || '').trim() || 'Petani Sawit-Ku';
+            const newKebun = (document.getElementById('profile-kebun-name')?.value || '').trim() || 'Kebun Sawit Mandiri';
+            const newLuas = Math.max(0, parseFloat(document.getElementById('profile-luas-lahan')?.value) || 0);
+            const newPohon = Math.max(0, parseInt(document.getElementById('profile-pohon-count')?.value, 10) || 0);
+            const newKontak = (document.getElementById('profile-kontak-hp')?.value || '').trim();
+
+            const existingBio = getSavedPetaniBiodata() || {};
+            let photoUrl = existingBio.photoUrl || document.getElementById('profile-avatar-img')?.src || 'https://placehold.co/120x120/2D5A27/FFFFFF?text=Sawit-Ku';
+
+            const photoInput = document.getElementById('profile-photo-input');
+
+            const commitProfile = async (finalPhotoUrl) => {
+                const updatedBio = {
+                    ...existingBio,
+                    uid: uid,
+                    namaPetani: newName,
+                    namaKebun: newKebun,
+                    luasLahan: newLuas,
+                    jumlahPohon: newPohon,
+                    kontak: newKontak,
+                    photoUrl: finalPhotoUrl,
+                    updatedAt: new Date().toISOString()
+                };
+
+                localStorage.setItem('sawit_petani_biodata', JSON.stringify(updatedBio));
+                applyPetaniBiodataToUI(updatedBio);
+
+                if (navigator.onLine && window.firebaseDb) {
+                    try {
+                        const userDocRef = doc(window.firebaseDb, 'artifacts', window.appId, 'users', uid, 'profile', 'info');
+                        await setDoc(userDocRef, updatedBio, { merge: true });
+                    } catch (e) {
+                        console.info("Profil cloud tersimpan offline:", e && e.message);
+                    }
+                }
+
+                playSound('success');
+                showToast("Biodata kebun berhasil diperbarui!");
+            };
+
+            if (photoInput && photoInput.files && photoInput.files[0]) {
+                const file = photoInput.files[0];
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.src = e.target.result;
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const MAX_SIZE = 150;
+                        let width = img.width, height = img.height;
+                        if (width > height) {
+                            if (width > MAX_SIZE) {
+                                height *= MAX_SIZE / width;
+                                width = MAX_SIZE;
+                            }
+                        } else {
+                            if (height > MAX_SIZE) {
+                                width *= MAX_SIZE / height;
+                                height = MAX_SIZE;
+                            }
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(img, 0, 0, width, height);
+                        photoUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        if (document.getElementById('profile-avatar-img')) {
+                            document.getElementById('profile-avatar-img').src = photoUrl;
+                        }
+                        commitProfile(photoUrl);
+                    };
+                };
+                reader.readAsDataURL(file);
+            } else {
+                commitProfile(photoUrl);
+            }
+        };
+
+        // Simpan Catatan Panen Baru
+        window.saveHarvestEntry = async function() {
+            if (!window.currentUser) {
+                showToast('Silakan masuk terlebih dahulu.');
+                return;
+            }
+
+            const jjg = Math.max(0, parseFloat(document.getElementById('input-harvest-jjg').value) || 0);
+            const totalKg = Math.max(0, parseFloat(document.getElementById('input-harvest-kg').value) || 0);
+            const hilangJjg = Math.max(0, parseFloat(document.getElementById('input-harvest-hilang').value) || 0);
+            const hargaPerKg = Math.max(0, parseFloat(document.getElementById('input-harvest-harga').value) || 0);
+            const ongkosPerKg = Math.max(0, parseFloat(document.getElementById('input-harvest-ongkos').value) || 0);
+
+            if (jjg <= 0 || totalKg <= 0 || hargaPerKg <= 0) {
+                playSound('warning');
+                alert("Mohon periksa: Jumlah janjang, total berat (Kg), dan harga sawit harus lebih dari 0!");
+                return;
+            }
+
+            if (hilangJjg > jjg) {
+                playSound('warning');
+                alert("Estimasi tandan hilang tidak boleh melebihi jumlah janjang yang dipanen!");
+                return;
+            }
+
+            const kotor = totalKg * hargaPerKg;
+            const ongkos = totalKg * ongkosPerKg;
+            const bersih = Math.max(0, kotor - ongkos);
+            const bjr = (totalKg / jjg).toFixed(1);
+
+            const now = new Date();
+            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+            
+            const timeString = `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()} - ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} WIB`;
+
+            const entryDoc = {
+                timestamp: timeString,
+                createdMillis: Date.now(),
+                dayName: days[now.getDay()],
+                dayDate: now.getDate(),
+                monthName: months[now.getMonth()],
+                year: now.getFullYear(),
+                jjg: jjg,
+                totalKg: totalKg,
+                hilangJjg: hilangJjg,
+                hargaPerKg: hargaPerKg,
+                ongkosPerKg: ongkosPerKg,
+                kotor: kotor,
+                ongkos: ongkos,
+                bersih: bersih,
+                bjr: bjr
+            };
+
+            const entryId = (crypto && crypto.randomUUID ? crypto.randomUUID() : `h_${Date.now()}_${Math.random().toString(36).slice(2,9)}`);
+            entryDoc.localId = entryId;
+
+            if (navigator.onLine && window.firebaseDb) {
+                try {
+                    const harvestRef = doc(window.firebaseDb, 'artifacts', window.appId, 'users', window.currentUser.uid, 'laporan_panen', entryId);
+                    await setDoc(harvestRef, entryDoc, { merge: false });
+                    playSound('success');
+                    showToast('Laporan panen berhasil disimpan ke cloud!');
+                } catch (e) {
+                    console.warn("Gagal simpan cloud, menyimpan antrean offline:", e);
+                    saveOfflineEntry('harvest', entryDoc, entryId);
+                }
+            } else {
+                saveOfflineEntry('harvest', entryDoc, entryId);
+            }
+
+            document.getElementById('input-harvest-jjg').value = '';
+            document.getElementById('input-harvest-kg').value = '';
+            document.getElementById('input-harvest-hilang').value = '0';
+            calculateHarvestPreview();
+        };
+
+        // Hapus Catatan Panen dengan Konfirmasi
+        window.deleteHarvestEntry = async function(id, timeDesc) {
+            if (!confirm(`Hapus catatan panen tanggal: ${timeDesc || 'ini'}?\n\nTindakan ini tidak dapat dibatalkan.`)) {
+                return;
+            }
+
+            // Hapus dari antrean offline jika ada
+            const uid = window.currentUser && window.currentUser.uid;
+            if (uid) {
+                const key = pendingSyncKey(uid);
+                const offlineData = readPendingSync(uid).filter(item => item.id !== id);
+                localStorage.setItem(key, JSON.stringify(offlineData));
+            }
+
+            if (navigator.onLine && window.firebaseDb && uid) {
+                try {
+                    const harvestRef = doc(window.firebaseDb, 'artifacts', window.appId, 'users', uid, 'laporan_panen', id);
+                    await deleteDoc(harvestRef);
+                    playSound('warning');
+                    showToast('Laporan panen berhasil dihapus.');
+                } catch (err) {
+                    console.error("Gagal menghapus:", err);
+                    showToast('Gagal menghapus laporan di cloud.');
+                }
+            } else {
+                // Mode offline
+                window.userHarvestData = (window.userHarvestData || []).filter(r => r.id !== id);
+                renderHarvestHistory(window.userHarvestData);
+                updateGlobalAnalytics();
+                playSound('warning');
+                showToast('Laporan panen dihapus secara lokal.');
+            }
+        };
+
+        // Simpan Catatan Perawatan / Pupuk
+        window.saveFertilizerEntry = async function() {
+            if (!window.currentUser) {
+                showToast('Silakan masuk terlebih dahulu.');
+                return;
+            }
+
+            const jenis = document.getElementById('input-fert-jenis').value;
+            const dosisPohon = Math.max(0, parseFloat(document.getElementById('input-fert-dosis').value) || 0);
+            const totalLiterHerbisida = Math.max(0, parseFloat(document.getElementById('input-fert-herbisida-liter').value) || 0);
+            const biayaBahan = Math.max(0, parseFloat(document.getElementById('input-fert-biaya-bahan').value) || 0);
+            const biayaKerja = Math.max(0, parseFloat(document.getElementById('input-fert-biaya-kerja').value) || 0);
+            const totalBiayaRawat = biayaBahan + biayaKerja;
+
+            if (jenis !== 'Penyemprotan Herbisida CBA' && dosisPohon <= 0) {
+                playSound('warning');
+                alert("Mohon masukkan dosis per pohon yang valid!");
+                return;
+            }
+            if (jenis === 'Penyemprotan Herbisida CBA' && totalLiterHerbisida <= 0) {
+                playSound('warning');
+                alert("Mohon masukkan total penggunaan herbisida dalam Liter!");
+                return;
+            }
+
+            const totalPohon = Math.max(0, parseInt(document.getElementById('harvest-pohon-count').value, 10) || 0);
+            const now = new Date();
+            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+            const timeString = `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()} - ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} WIB`;
+
+            const fertDoc = {
+                timestamp: timeString,
+                createdMillis: Date.now(),
+                dayName: days[now.getDay()],
+                dayDate: now.getDate(),
+                monthName: months[now.getMonth()],
+                year: now.getFullYear(),
+                jenis: jenis,
+                dosisPohon: dosisPohon,
+                totalLiterHerbisida: totalLiterHerbisida,
+                totalPohon: totalPohon,
+                biayaBahan: biayaBahan,
+                biayaKerja: biayaKerja,
+                totalBiayaRawat: totalBiayaRawat
+            };
+
+            const entryId = (crypto && crypto.randomUUID ? crypto.randomUUID() : `f_${Date.now()}_${Math.random().toString(36).slice(2,9)}`);
+            fertDoc.localId = entryId;
+
+            if (navigator.onLine && window.firebaseDb) {
+                try {
+                    const fertRef = doc(window.firebaseDb, 'artifacts', window.appId, 'users', window.currentUser.uid, 'laporan_pupuk', entryId);
+                    await setDoc(fertRef, fertDoc, { merge: false });
+                    playSound('success');
+                    showToast('Laporan perawatan berhasil disimpan ke cloud!');
+                } catch (e) {
+                    console.warn("Gagal simpan cloud, menyimpan antrean offline:", e);
+                    saveOfflineEntry('fertilizer', fertDoc, entryId);
+                }
+            } else {
+                saveOfflineEntry('fertilizer', fertDoc, entryId);
+            }
+
+            document.getElementById('input-fert-dosis').value = '';
+            document.getElementById('input-fert-herbisida-liter').value = '';
+            document.getElementById('input-fert-biaya-bahan').value = '';
+            document.getElementById('input-fert-biaya-kerja').value = '';
+        };
+
+        // Hapus Catatan Perawatan dengan Konfirmasi
+        window.deleteFertilizerEntry = async function(id, jenis, timeDesc) {
+            if (!confirm(`Hapus catatan perawatan "${jenis}" tanggal ${timeDesc || 'ini'}?\n\nTindakan ini tidak dapat dibatalkan.`)) {
+                return;
+            }
+
+            const uid = window.currentUser && window.currentUser.uid;
+            if (uid) {
+                const key = pendingSyncKey(uid);
+                const offlineData = readPendingSync(uid).filter(item => item.id !== id);
+                localStorage.setItem(key, JSON.stringify(offlineData));
+            }
+
+            if (navigator.onLine && window.firebaseDb && uid) {
+                try {
+                    const fertRef = doc(window.firebaseDb, 'artifacts', window.appId, 'users', uid, 'laporan_pupuk', id);
+                    await deleteDoc(fertRef);
+                    playSound('warning');
+                    showToast('Laporan perawatan berhasil dihapus.');
+                } catch (err) {
+                    console.error("Gagal menghapus perawatan di cloud:", err);
+                    showToast('Gagal menghapus laporan di cloud.');
+                }
+            } else {
+                window.userFertilizerData = (window.userFertilizerData || []).filter(r => r.id !== id);
+                renderFertilizerHistory(window.userFertilizerData);
+                updateGlobalAnalytics();
+                playSound('warning');
+                showToast('Laporan perawatan dihapus secara lokal.');
+            }
+        };
+
+        function pendingSyncKey(uid) { 
+            return `sawit_ku_pending_sync_${uid}`; 
+        }
+
+        function readPendingSync(uid) {
+            try { 
+                return JSON.parse(localStorage.getItem(pendingSyncKey(uid)) || '[]'); 
+            } catch (e) { 
+                return []; 
+            }
+        }
+
+        function saveOfflineEntry(type, docData, docId) {
+            const uid = window.currentUser && window.currentUser.uid;
+            if (!uid) { 
+                showToast('Gagal menyimpan offline: Pengguna belum terikat.'); 
+                return; 
+            }
+            const key = pendingSyncKey(uid);
+            const offlineData = readPendingSync(uid);
+            if (!offlineData.some(item => item.id === docId)) {
+                offlineData.push({ id: docId, ownerUid: uid, type, data: docData });
+            }
+            localStorage.setItem(key, JSON.stringify(offlineData));
+            playSound('sync');
+            showToast('Mode Offline: Data tersimpan di HP dan akan disinkronkan saat online.');
+        }
+
+        window.checkOfflinePendingSync = async function() {
+            const user = window.currentUser;
+            if (!navigator.onLine || !user || !window.firebaseDb) return;
+            const key = pendingSyncKey(user.uid);
+            const pending = readPendingSync(user.uid);
+            if (!pending.length) return;
+            
+            showToast('Menyinkronkan data offline ke Cloud...');
+            const remaining = [];
+            for (const item of pending) {
+                if (item.ownerUid && item.ownerUid !== user.uid) { 
+                    remaining.push(item); 
+                    continue; 
+                }
+                try {
+                    const collectionName = item.type === 'harvest' ? 'laporan_panen' : item.type === 'fertilizer' ? 'laporan_pupuk' : null;
+                    if (!collectionName) continue;
+                    const target = doc(window.firebaseDb, 'artifacts', window.appId, 'users', user.uid, collectionName, item.id);
+                    await setDoc(target, item.data, { merge: false });
+                } catch (error) {
+                    console.error("Gagal sinkron item offline:", error);
+                    remaining.push(item);
+                }
+            }
+            if (remaining.length) {
+                localStorage.setItem(key, JSON.stringify(remaining));
+            } else {
+                localStorage.removeItem(key);
+            }
+            playSound('success');
+            showToast(remaining.length ? `${remaining.length} data masih dalam antrean.` : 'Sinkronisasi offline selesai.');
+        };
+
+        window.addEventListener('online', () => {
+            updateConnectionStatus(true);
+            window.checkOfflinePendingSync();
+        });
+
+        window.addEventListener('offline', () => {
+            updateConnectionStatus(false);
+        });
+
+        function showBiodataAlert(msg, color = "red") {
+            const biodataAlert = document.getElementById('biodata-alert');
+            if (!biodataAlert) return;
+            biodataAlert.innerText = msg;
+            biodataAlert.className = `p-3 text-xs rounded-xl border text-center ${color === 'red' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`;
+            biodataAlert.classList.remove('hidden');
+        }
+        window.showBiodataAlert = showBiodataAlert;
+        window.showAuthAlert = showBiodataAlert;
+    </script>
+</head>
+<body class="min-h-screen flex flex-col justify-between relative bg-sageBg">
+
+    <!-- BIODATA PETANI & KEBUN MODAL (PENGGANTI FORM LOGIN) -->
+    <div id="biodata-modal" class="fixed inset-0 bg-charcoal/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-fade-enter">
+        <div class="bg-white rounded-2xl shadow-2xl border border-softBorder max-w-md w-full p-6 space-y-4 max-h-[92vh] overflow-y-auto modal-card-enter">
+            <div class="text-center space-y-1.5">
+                <div class="w-14 h-14 bg-sageLight text-sagePrimary rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-sm border border-emeraldSoft">
+                    🌴
+                </div>
+                <h1 class="text-xl font-bold text-charcoal">Sawit-Ku</h1>
+                <p class="text-xs text-slate-500">Pencatatan Panen, Perawatan, & Neraca Kebun Kelapa Sawit</p>
+                <div class="inline-block bg-sageLight text-sagePrimary text-[10px] font-semibold px-2.5 py-0.5 rounded-full border border-emeraldSoft">
+                    Diciptakan oleh Abdul Jalil
+                </div>
+            </div>
+
+            <div class="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 text-xs text-slate-700 space-y-1">
+                <p class="font-bold text-sagePrimary flex items-center">
+                    <i class="fa-solid fa-id-card mr-1.5"></i> Biodata Petani & Kebun Sawit
+                </p>
+                <p class="text-[11px] text-slate-600 leading-relaxed">
+                    Mulai pencatatan langsung tanpa login email dan kata sandi. Cukup isi identitas kebun Anda di bawah ini:
+                </p>
+            </div>
+
+            <div id="biodata-alert" class="hidden"></div>
+
+            <div class="space-y-3.5 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">
+                        Nama Pemilik / Petani <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-3 top-3 text-slate-400"></i>
+                        <input type="text" id="setup-nama-petani" placeholder="Contoh: Abdul Jalil / Pak Budi" class="w-full pl-9 pr-3 py-2.5 bg-sageBg border border-softBorder rounded-xl text-xs font-semibold focus:ring-2 focus:ring-sagePrimary focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">
+                        Nama / Lokasi Kebun <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <i class="fa-solid fa-map-location-dot absolute left-3 top-3 text-slate-400"></i>
+                        <input type="text" id="setup-nama-kebun" placeholder="Contoh: Kebun Sawit Blok A - Riau" class="w-full pl-9 pr-3 py-2.5 bg-sageBg border border-softBorder rounded-xl text-xs font-semibold focus:ring-2 focus:ring-sagePrimary focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">
+                            Luas Lahan (Ha)
+                        </label>
+                        <div class="relative">
+                            <i class="fa-solid fa-chart-area absolute left-3 top-3 text-slate-400"></i>
+                            <input type="number" id="setup-luas-lahan" step="0.1" min="0" placeholder="Contoh: 2.5" class="w-full pl-9 pr-3 py-2.5 bg-sageBg border border-softBorder rounded-xl text-xs font-semibold focus:ring-2 focus:ring-sagePrimary focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">
+                            Jumlah Pohon Sawit
+                        </label>
+                        <div class="relative">
+                            <i class="fa-solid fa-tree absolute left-3 top-3 text-slate-400"></i>
+                            <input type="number" id="setup-jumlah-pohon" min="0" placeholder="Contoh: 350" class="w-full pl-9 pr-3 py-2.5 bg-sageBg border border-softBorder rounded-xl text-xs font-semibold focus:ring-2 focus:ring-sagePrimary focus:outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">
+                        Nomor WhatsApp / HP (Opsional)
+                    </label>
+                    <div class="relative">
+                        <i class="fa-brands fa-whatsapp absolute left-3 top-3 text-emerald-600"></i>
+                        <input type="tel" id="setup-kontak-hp" placeholder="Contoh: 0812-3456-7890" class="w-full pl-9 pr-3 py-2.5 bg-sageBg border border-softBorder rounded-xl text-xs font-semibold focus:ring-2 focus:ring-sagePrimary focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <button type="button" onclick="submitPetaniBiodata()" class="w-full bg-sagePrimary hover:bg-sageHover text-white py-3 rounded-xl text-xs font-bold shadow-md transition-all flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-circle-check text-sm"></i>
+                        <span>SIMPAN BIODATA & MASUK APLIKASI</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="text-center pt-3 border-t border-softBorder space-y-1">
+                <p class="text-[10px] text-slate-500">
+                    Data tersimpan aman di perangkat Anda & disinkronkan secara otomatis.
+                </p>
+                <p class="text-[10px] text-slate-400">
+                    Aplikasi Resmi Sawit-Ku &bull; Diciptakan oleh <b>Abdul Jalil</b>
+                </p>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- PWA INSTALLATION INSTRUCTION MODAL -->
+    <div id="pwa-install-modal" class="fixed inset-0 bg-charcoal/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl border border-softBorder max-w-sm w-full p-6 space-y-4 text-xs">
+            <div class="flex items-center justify-between border-b border-softBorder pb-2">
+                <h3 class="font-bold text-sm text-sagePrimary flex items-center">
+                    <i class="fa-solid fa-download mr-2"></i> Unduh Aplikasi Sawit-Ku
+                </h3>
+                <button onclick="closePwaModal()" class="text-slate-400 hover:text-charcoal text-base font-bold">&times;</button>
+            </div>
+            <p class="text-slate-600 leading-relaxed">
+                Aplikasi <b>Sawit-Ku</b> berbasis Progressive Web App (PWA) sehingga dapat langsung diinstall ke layar utama HP Anda tanpa melalui Play Store / App Store:
+            </p>
+            <button id="pwa-install-action" onclick="installSawitPwa()" class="hidden w-full bg-sagePrimary hover:bg-sageHover text-white py-2 rounded-xl font-bold shadow-md"><i class="fa-solid fa-download mr-2"></i><span id="pwa-install-action-label">Install Aplikasi</span></button>
+            <p class="text-[10px] text-slate-500">Instalasi otomatis hanya tersedia jika aplikasi dibuka melalui HTTPS atau localhost dan browser mendukung PWA.</p>
+            <div class="space-y-2 bg-sageBg p-3 rounded-xl border border-softBorder text-slate-700">
+                <p class="font-bold text-sagePrimary"><i class="fa-brands fa-android mr-1"></i> Pengguna Android (Chrome):</p>
+                <p class="pl-3">1. Ketuk ikon <b>Titik Tiga (⋮)</b> di kanan atas browser.<br>2. Pilih <b>"Tambahkan ke Layar Utama"</b> atau <b>"Install Aplikasi"</b>.</p>
+                
+                <p class="font-bold text-sagePrimary pt-1"><i class="fa-brands fa-apple mr-1"></i> Pengguna iPhone (Safari):</p>
+                <p class="pl-3">1. Ketuk ikon <b>Bagikan (Share)</b> di bagian bawah.<br>2. Gulir ke bawah lalu pilih <b>"Add to Home Screen"</b>.</p>
+            </div>
+            <button onclick="closePwaModal()" class="w-full bg-sagePrimary hover:bg-sageHover text-white py-2 rounded-xl font-bold shadow-md">
+                Mengerti & Tutup
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div id="main-app-content" class="hidden flex-1 flex flex-col max-w-2xl w-full mx-auto pb-20">
+        
+        <!-- HEADER TOP BAR: GPS LOCATION & REAL-TIME CLOCK -->
+        <header class="bg-white border-b border-softBorder sticky top-0 z-30 px-4 py-2.5 shadow-sm space-y-1.5 no-print">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 bg-sagePrimary text-white rounded-xl flex items-center justify-center font-bold text-base shadow-sm">
+                        🌴
+                    </div>
+                    <div>
+                        <h1 class="text-sm font-bold text-charcoal leading-none">Sawit-Ku</h1>
+                        <p class="text-[9px] text-sagePrimary font-semibold mt-0.5">Diciptakan oleh Abdul Jalil</p>
+                        <p id="header-farmer-label" class="text-[9px] text-slate-500 font-medium truncate max-w-[130px] sm:max-w-[220px] hidden"></p>
+                    </div>
+                </div>
+
+                <!-- ONLINE BADGE & MUTE & DOWNLOAD PWA BUTTON -->
+                <div class="flex items-center space-x-1.5">
+                    <div id="connection-status-badge" class="bg-emeraldSoft text-sagePrimary text-[9px] font-bold px-2 py-0.5 rounded-full border border-emerald-300 flex items-center space-x-1">
+                        <span class="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-ping"></span>
+                        <span>Online</span>
+                    </div>
+
+                    <button onclick="toggleAudioMute()" class="mute-toggle-btn bg-sageBg border border-softBorder hover:bg-slate-100 text-[10px] font-bold px-2 py-1 rounded-xl text-slate-600 transition-all">
+                        <i class="fa-solid fa-volume-high text-sagePrimary"></i>
+                        <span class="ml-1 hidden sm:inline">Suara On</span>
+                    </button>
+
+                    <button onclick="openPwaModal()" class="bg-sagePrimary hover:bg-sageHover text-white text-[10px] font-bold px-2.5 py-1 rounded-xl transition-all shadow-sm flex items-center space-x-1">
+                        <i class="fa-solid fa-download"></i>
+                        <span class="hidden sm:inline">UNDUH APP</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- GPS Location & Weather Banner -->
+            <div class="grid grid-cols-2 gap-2">
+                <div id="gps-weather-badge" class="bg-sageLight px-3 py-1 rounded-xl border border-emeraldSoft flex items-center space-x-2 text-xs">
+                    <i class="fa-solid fa-location-dot text-sagePrimary animate-pulse"></i>
+                    <div>
+                        <p id="gps-location-text" class="font-bold text-sagePrimary text-[10px]">Mencari GPS...</p>
+                        <p id="gps-weather-text" class="text-[9px] text-slate-600">Menunggu data cuaca</p>
+                    </div>
+                </div>
+
+                <!-- Continuous Real-Time Clock Banner -->
+                <div class="bg-sageBg p-1 rounded-xl border border-softBorder flex flex-col justify-center text-[9px] text-slate-600 font-medium px-2.5 text-right">
+                    <span id="realtime-date-text">Memuat Tanggal...</span>
+                    <span id="realtime-time-text" class="font-bold text-sagePrimary">--:--:-- WIB</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN PAGE VIEWS -->
+        <main class="flex-1 p-4 relative min-h-[500px]">
+            
+            <!-- HALAMAN 1: LAB 3D SANDBOX -->
+            <section id="page-1" class="page-view space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-base font-bold text-charcoal flex items-center">
+                            <i class="fa-solid fa-flask text-sagePrimary mr-2"></i> HALAMAN 1: LAB 3D SANDBOX
+                        </h2>
+                        <p class="text-xs text-slate-500">Simulasi indikatif dosis pupuk dan kondisi cuaca</p>
+                    </div>
+                    <button onclick="openPwaModal()" class="bg-sageLight text-sagePrimary text-[10px] font-bold px-2.5 py-1 rounded-lg border border-emeraldSoft hover:bg-emeraldSoft transition-all flex items-center space-x-1 no-print">
+                        <i class="fa-solid fa-download"></i>
+                        <span>UNDUH APP</span>
+                    </button>
+                </div>
+
+                <!-- 3D Canvas -->
+                <div class="bg-white p-3 rounded-2xl border border-softBorder shadow-sm space-y-2">
+                    <div id="canvas3d-container">
+                        <div class="absolute top-3 left-3 bg-white/85 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[10px] font-semibold text-sagePrimary border border-emeraldSoft shadow-sm">
+                            <i class="fa-solid fa-rotate mr-1"></i> Rotasi 360° (Geser Layar / Mouse)
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                        <div class="bg-sageBg p-2 rounded-xl border border-softBorder">
+                            <p class="text-[9px] text-slate-400 uppercase font-bold">Estimasi Hasil</p>
+                            <p id="sim-pred-yield" class="font-bold text-sagePrimary text-sm">0 Kg</p>
+                            <p class="text-[9px] text-slate-400">/ 2 Minggu</p>
+                        </div>
+                        <div class="bg-sageBg p-2 rounded-xl border border-softBorder">
+                            <p class="text-[9px] text-slate-400 uppercase font-bold">Hitungan BJR</p>
+                            <p id="sim-bjr" class="font-bold text-emerald-600 text-sm">0 Kg</p>
+                            <p class="text-[9px] text-slate-400">/ Janjang</p>
+                        </div>
+                        <div class="bg-sageBg p-2 rounded-xl border border-softBorder">
+                            <p class="text-[9px] text-slate-400 uppercase font-bold">Status Vegetatif</p>
+                            <p id="sim-status" class="font-bold text-blue-600 text-xs">BELUM ADA DATA</p>
+                            <p class="text-[9px] text-slate-400">Tanaman Sehat</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RANGKUMAN DASHBOARD ANALISIS NARASI RACIKAN -->
+                <div class="bg-white p-4 rounded-2xl border border-softBorder shadow-sm space-y-2.5">
+                    <h3 class="text-xs font-bold text-sagePrimary flex items-center border-b border-softBorder pb-2">
+                        <i class="fa-solid fa-square-poll-vertical text-sagePrimary mr-1.5"></i> Rangkuman Analisis & Narasi Agronomis Presisi
+                    </h3>
+                    <div id="racikan-narrative-box" class="bg-sageBg p-3 rounded-xl border border-softBorder text-xs text-slate-700 leading-relaxed space-y-1.5">
+                        <p class="font-bold text-sagePrimary"><i class="fa-solid fa-circle-info mr-1"></i> Diagnosa Racikan Saat Ini:</p>
+                        <p id="narrative-text-main">Menganalisis racikan pupuk dan parameter cuaca...</p>
+                        <div id="narrative-tips" class="pt-1 text-[11px] text-slate-500 border-t border-slate-200">
+                            <b>Rekomendasi Tindakan:</b> Pertahankan dosis seimbang untuk hasil panen konsisten.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Control Panel Sliders -->
+                <div class="bg-white p-4 rounded-2xl border border-softBorder shadow-sm space-y-4">
+                    <h3 class="text-xs font-bold text-charcoal border-b border-softBorder pb-2 flex items-center justify-between">
+                        <span><i class="fa-solid fa-sliders text-sagePrimary mr-1.5"></i> Panel Kendali Racikan Manual</span>
+                        <button onclick="resetSliders()" class="text-[10px] text-slate-400 hover:text-sagePrimary font-medium">Reset Standar</button>
+                    </h3>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between font-medium mb-1">
+                                    <span>Urea / ZA (N)</span>
+                                    <span id="val-urea" class="font-bold text-sagePrimary">0.0 kg/pohon</span>
+                                </div>
+                                <input type="range" id="slider-urea" min="0" max="3" step="0.1" value="0" oninput="updateSimulation()" class="w-full">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between font-medium mb-1">
+                                    <span>Dolomit / RP (pH)</span>
+                                    <span id="val-dolomit" class="font-bold text-sagePrimary">0.0 kg/pohon</span>
+                                </div>
+                                <input type="range" id="slider-dolomit" min="0" max="3" step="0.1" value="0" oninput="updateSimulation()" class="w-full">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between font-medium mb-1">
+                                    <span>KCL / MOP (Bobot)</span>
+                                    <span id="val-kcl" class="font-bold text-sagePrimary">0.0 kg/pohon</span>
+                                </div>
+                                <input type="range" id="slider-kcl" min="0" max="3" step="0.1" value="0" oninput="updateSimulation()" class="w-full">
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between font-medium mb-1">
+                                    <span>NPK Compound</span>
+                                    <span id="val-npk" class="font-bold text-sagePrimary">0.0 kg/pohon</span>
+                                </div>
+                                <input type="range" id="slider-npk" min="0" max="4" step="0.2" value="0" oninput="updateSimulation()" class="w-full">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between font-medium mb-1">
+                                    <span>Borate (Mikro)</span>
+                                    <span id="val-borate" class="font-bold text-sagePrimary">0 gram/pohon</span>
+                                </div>
+                                <input type="range" id="slider-borate" min="0" max="200" step="10" value="0" oninput="updateSimulation()" class="w-full">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between font-medium mb-1">
+                                    <span>Herbisida CBA (Rumput)</span>
+                                    <span id="val-cba" class="font-bold text-sagePrimary">0 ml/tanki</span>
+                                </div>
+                                <input type="range" id="slider-cba" min="0" max="500" step="25" value="0" oninput="updateSimulation()" class="w-full">
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="text-xs font-bold text-charcoal border-b border-softBorder pt-2 pb-2">
+                        <i class="fa-solid fa-cloud-sun-rain text-blue-600 mr-1.5"></i> Agroklimatologi & Cuaca Presisi
+                    </h3>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div>
+                            <div class="flex justify-between font-medium mb-1">
+                                <span>Hujan (%)</span>
+                                <span id="val-hujan" class="font-bold text-blue-600">0% (Kering)</span>
+                            </div>
+                            <input type="range" id="slider-hujan" min="0" max="100" value="0" oninput="updateSimulation()" class="w-full">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between font-medium mb-1">
+                                <span>Panas (Hari/Bln)</span>
+                                <span id="val-panas" class="font-bold text-amber-600">0 Hari</span>
+                            </div>
+                            <input type="range" id="slider-panas" min="0" max="30" value="0" oninput="updateSimulation()" class="w-full">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between font-medium mb-1">
+                                <span>Suhu (°C)</span>
+                                <span id="val-suhu" class="font-bold text-red-500">0 °C</span>
+                            </div>
+                            <input type="range" id="slider-suhu" min="0" max="40" value="0" oninput="updateSimulation()" class="w-full">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- HALAMAN 2: ENGINE ANALISIS & NERACA KEUANGAN KEBUN -->
+            <section id="page-2" class="page-view page-hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-base font-bold text-charcoal flex items-center">
+                            <i class="fa-solid fa-chart-pie text-sagePrimary mr-2"></i> HALAMAN 2: NERACA KEUANGAN & ANALISIS
+                        </h2>
+                        <p class="text-xs text-slate-500">Ringkasan Otomatis Hasil Panen & Pengeluaran Perawatan</p>
+                    </div>
+                    <div class="flex items-center space-x-1.5 no-print">
+                        <button onclick="window.print()" class="bg-slate-700 hover:bg-slate-800 text-white text-[10px] font-bold px-2.5 py-1.5 rounded-xl transition-all shadow-sm flex items-center space-x-1">
+                            <i class="fa-solid fa-print"></i>
+                            <span>CETAK PDF</span>
+                        </button>
+                        <button onclick="exportFinancialBalanceToExcel()" class="bg-sagePrimary hover:bg-sageHover text-white text-[10px] font-bold px-2.5 py-1.5 rounded-xl transition-all shadow-sm flex items-center space-x-1">
+                            <i class="fa-solid fa-file-excel"></i>
+                            <span>EXCEL NERACA</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- COLOR-CODED FINANCIAL SUMMARY CARDS -->
+                <div class="space-y-2.5">
+                    <h3 class="text-xs font-bold text-charcoal flex items-center justify-between">
+                        <span><i class="fa-solid fa-wallet text-sagePrimary mr-1.5"></i> Ringkasan Neraca Keuangan Kebun</span>
+                        <span class="text-[10px] text-slate-400 font-normal">Sinkronisasi Cloud Real-Time</span>
+                    </h3>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-kotorBg border border-emerald-200 p-3.5 rounded-2xl shadow-sm">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-[10px] font-bold text-kotorText uppercase">Pencatatan Kotor</span>
+                                <i class="fa-solid fa-sack-dollar text-kotorText text-sm"></i>
+                            </div>
+                            <p id="neraca-kotor" class="text-lg font-extrabold text-kotorText">Rp 0</p>
+                            <p class="text-[9px] text-emerald-800 font-medium">Dari Total Berat Sawit Panen</p>
+                        </div>
+
+                        <div class="bg-panenBg border border-red-200 p-3.5 rounded-2xl shadow-sm">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-[10px] font-bold text-panenText uppercase">Ongkos Pekerja Panen</span>
+                                <i class="fa-solid fa-hand-holding-dollar text-panenText text-sm"></i>
+                            </div>
+                            <p id="neraca-ongkos-panen" class="text-lg font-extrabold text-panenText">Rp 0</p>
+                            <p class="text-[9px] text-red-800 font-medium">Upah Dodos / Angkut</p>
+                        </div>
+
+                        <div class="bg-rawatBg border border-amber-200 p-3.5 rounded-2xl shadow-sm">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-[10px] font-bold text-rawatText uppercase">Biaya Perawatan</span>
+                                <i class="fa-solid fa-spray-can-sparkles text-rawatText text-sm"></i>
+                            </div>
+                            <p id="neraca-biaya-rawat" class="text-lg font-extrabold text-rawatText">Rp 0</p>
+                            <p class="text-[9px] text-amber-800 font-medium">Pupuk + Obat + Pekerja</p>
+                        </div>
+
+                        <div class="bg-bersihBg border border-emerald-300 p-3.5 rounded-2xl shadow-sm">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-[10px] font-bold text-bersihText uppercase">Uang Bersih (Nett)</span>
+                                <i class="fa-solid fa-piggy-bank text-bersihText text-sm"></i>
+                            </div>
+                            <p id="neraca-uang-bersih" class="text-lg font-extrabold text-bersihText">Rp 0</p>
+                            <p class="text-[9px] text-emerald-900 font-bold">Kotor - (Panen + Perawatan)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MONTHLY FINANCIAL TREND CHART -->
+                <div class="bg-white p-4 rounded-2xl border border-softBorder shadow-sm space-y-3">
+                    <h3 class="text-xs font-bold text-charcoal flex items-center justify-between border-b border-softBorder pb-2">
+                        <span><i class="fa-solid fa-chart-line text-sagePrimary mr-1.5"></i> Tren Keuangan Bulanan Kebun</span>
+                        <span class="text-[10px] text-slate-400 font-normal">Visualisasi Hasil vs Bersih</span>
+                    </h3>
+                    <div class="w-full h-48">
+                        <canvas id="monthlyTrendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- BJR Analytics Card -->
+                <div class="bg-white p-4 rounded-2xl border border-softBorder shadow-sm space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-charcoal"><i class="fa-solid fa-weight-scale text-sagePrimary mr-1.5"></i> Analisis BJR (Berat Janjang Rata-rata)</span>
+                        <span id="ana-bjr-badge" class="bg-emeraldSoft text-sagePrimary text-[10px] font-bold px-2 py-0.5 rounded-full">BJR Terpantau</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 text-center">
+                        <div class="bg-sageBg p-3 rounded-xl border border-softBorder">
+                            <p class="text-[10px] text-slate-500 font-medium">BJR Rata-rata Kebun</p>
+                            <p id="ana-bjr-val" class="text-xl font-bold text-sagePrimary">0.0 Kg</p>
+                            <p class="text-[9px] text-slate-400">Target Ideal &gt; 8.0 Kg</p>
+                        </div>
+                        <div class="bg-sageBg p-3 rounded-xl border border-softBorder">
+                            <p class="text-[10px] text-slate-500 font-medium">Total Timbangan Panen</p>
+                            <p id="ana-total-kg" class="text-xl font-bold text-charcoal">0.0 Kg</p>
+                            <p id="ana-total-jjg" class="text-[9px] text-slate-400">Dari 0 Janjang</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Theft Warning -->
+                <div class="bg-white p-4 rounded-2xl border border-softBorder shadow-sm space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-red-600"><i class="fa-solid fa-triangle-exclamation mr-1.5"></i> Theft Warning (Deteksi Kehilangan/Maling)</span>
+                        <span class="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full">Alert Kebocoran TBS</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-red-50 p-3 rounded-xl border border-red-200">
+                            <p class="text-[10px] text-red-700 font-medium">Estimasi Tandan Hilang</p>
+                            <p id="ana-hilang-jjg" class="text-lg font-bold text-red-600">0 Janjang</p>
+                        </div>
+                        <div class="bg-red-50 p-3 rounded-xl border border-red-200">
+                            <p class="text-[10px] text-red-700 font-medium">Potensi Kerugian Rp</p>
+                            <p id="ana-hilang-rp" class="text-lg font-bold text-red-600">Rp 0</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- HALAMAN 3: LAPORAN HASIL PANEN (2 MINGGUAN) -->
+            <section id="page-3" class="page-view page-hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-base font-bold text-charcoal flex items-center">
+                            <i class="fa-solid fa-clipboard-list text-sagePrimary mr-2"></i> HALAMAN 3: LAPORAN HASIL PANEN
+                        </h2>
+                        <p class="text-xs text-slate-500">Pencatatan Hasil Panen per Siklus 2 Minggu</p>
+                    </div>
+                    <button onclick="exportHarvestToExcel()" class="bg-sageLight text-sagePrimary border border-emeraldSoft hover:bg-emeraldSoft text-[10px] font-bold px-2.5 py-1.5 rounded-xl transition-all flex items-center space-x-1 no-print">
+                        <i class="fa-solid fa-file-excel text-emerald-700"></i>
+                        <span>EXCEL PANEN</span>
+                    </button>
+                </div>
+
+                <!-- Input Jumlah Pohon Manual -->
+                <div class="bg-sageLight p-3.5 rounded-2xl border border-emeraldSoft flex items-center justify-between">
+                    <div class="text-xs">
+                        <p class="font-bold text-sagePrimary">Jumlah Pohon Kebun Saya</p>
+                        <p class="text-[10px] text-slate-600">Digunakan sebagai dasar perhitungan populasi kebun</p>
+                    </div>
+                    <div class="w-28">
+                        <input type="number" id="harvest-pohon-count" min="0" value="0" onchange="saveUserProfile()" class="w-full p-2 text-center bg-white border border-emeraldSoft rounded-xl font-bold text-sagePrimary text-xs focus:ring-1 focus:ring-sagePrimary">
+                    </div>
+                </div>
+
+                <!-- Form Entry Card -->
+                <div class="bg-white p-4 rounded-2xl border border-softBorder shadow-sm space-y-3">
+                    <h3 class="text-xs font-bold text-charcoal border-b border-softBorder pb-2 flex items-center justify-between">
+                        <span><i class="fa-solid fa-pen-to-square text-sagePrimary mr-1.5"></i> Input Pencatatan Panen Baru</span>
+                        <span class="text-[10px] text-slate-400 font-normal">Siklus 2 Minggu</span>
+                    </h3>
+
+                    <div class="space-y-3 text-xs">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block font-semibold mb-1 text-slate-700">Jumlah Janjang (JJG)</label>
+                                <input type="number" id="input-harvest-jjg" min="0" placeholder="0" oninput="calculateHarvestPreview()" class="w-full p-2.5 bg-sageBg border border-softBorder rounded-xl text-xs focus:ring-1 focus:ring-sagePrimary">
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold mb-1 text-slate-700">Total Berat Timbangan (Kg)</label>
+                                <input type="number" id="input-harvest-kg" min="0" placeholder="0.0" oninput="calculateHarvestPreview()" class="w-full p-2.5 bg-sageBg border border-softBorder rounded-xl text-xs focus:ring-1 focus:ring-sagePrimary">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block font-semibold mb-1 text-slate-700">Harga Sawit / Kg (Rp)</label>
+                                <input type="number" id="input-harvest-harga" min="0" value="0" oninput="calculateHarvestPreview()" class="w-full p-2.5 bg-sageBg border border-softBorder rounded-xl text-xs focus:ring-1 focus:ring-sagePrimary">
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold mb-1 text-slate-700">Ongkos Panen / Kg (Rp)</label>
+                                <input type="number" id="input-harvest-ongkos" min="0" value="0" oninput="calculateHarvestPreview()" class="w-full p-2.5 bg-sageBg border border-softBorder rounded-xl text-xs focus:ring-1 focus:ring-sagePrimary">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block font-semibold mb-1 text-red-600">Estimasi Tandan Hilang / Maling (JJG)</label>
+                            <input type="number" id="input-harvest-hilang" min="0" value="0" class="w-full p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs focus:ring-1 focus:ring-red-400 text-red-700 font-bold">
+                        </div>
+
+                        <!-- Instant Live Computation Preview -->
+                        <div class="bg-sageBg p-3 rounded-xl border border-softBorder space-y-1.5 text-slate-700">
+                            <div class="flex justify-between font-medium">
+                                <span>Hitungan BJR Panen Ini:</span>
+                                <span id="prev-harvest-bjr" class="font-bold text-sagePrimary">0.0 Kg/JJG</span>
+                            </div>
+                            <div class="flex justify-between font-medium">
+                                <span>Pendapatan Kotor:</span>
+                                <span id="prev-harvest-kotor" class="font-bold text-kotorText">Rp 0</span>
+                            </div>
+                            <div class="flex justify-between font-medium">
+                                <span>Total Ongkos Pekerja:</span>
+                                <span id="prev-harvest-ongkos" class="font-bold text-panenText">Rp 0</span>
+                            </div>
+                            <div class="flex justify-between font-bold pt-1 border-t border-slate-200">
+                                <span class="text-sagePrimary">Uang Didapat (Nett):</span>
+                                <span id="prev-harvest-bersih" class="text-base text-bersihText">Rp 0</span>
+                            </div>
+                        </div>
+
+                        <button onclick="saveHarvestEntry()" class="w-full bg-sagePrimary hover:bg-sageHover text-white py-3 rounded-xl text-xs font-semibold shadow-md transition-all flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>SIMPAN LAPORAN PANEN (Auto-Sync)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- History Harvest Log Table -->
+                <div class="bg-white p-4 rounded-2xl border border-softBorder shadow-sm space-y-3">
+                    <h3 class="text-xs font-bold text-charcoal border-b border-softBorder pb-2 flex items-center justify-between">
+                        <span><i class="fa-solid fa-clock-rotate-left text-sagePrimary mr-1.5"></i> Riwayat Laporan Panen 2-Mingguan</span>
+                        <span class="text-[10px] text-slate-400 font-normal">Real-Time Cloud</span>
+                    </h3>
+                    <div id="harvest-history-list" class="space-y-2 max-h-72 overflow-y-auto text-xs">
+                        <div class="text-center text-slate-400 py-6 text-xs">Belum ada riwayat laporan panen.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- HALAMAN 4: LAPORAN KHUSUS PEMUPUKAN & PERAWATAN -->
+            <section id="page-4" class="page-view page-hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-base font-bold text-charcoal flex items-center">
+                            <i class="fa-solid fa-spray-can-sparkles text-sagePrimary mr-2"></i> HALAMAN 4: PERAWATAN & PEMUPUKAN
+                        </h2>
+                        <p class="text-xs text-slate-500">Pencatatan Dosis Pupuk & Penyemprotan Herbisida</p>
+                    </div>
+                    <button onclick="exportFertilizerToExcel()" class="bg-sageLight text-sagePrimary border border-emeraldSoft hover:bg-emeraldSoft text-[10px] font-bold px-2.5 py-1.5 rounded-xl transition-all flex items-center space-x-1 no-print">
+                        <i class="fa-solid fa-file-excel text-emerald-700"></i>
+                        <span>EXCEL PERAWATAN</span>
+                    </button>
+                </div>
+
+                <!-- Input Form Card -->
+                <div class="bg-white p-4 rounded-2xl border border-softBorder shadow-sm space-y-3">
+                    <h3 class="text-xs font-bold text-charcoal border-b border-softBorder pb-2 flex items-center justify-between">
+                        <span><i class="fa-solid fa-square-plus text-sagePrimary mr-1.5"></i> Input Pemupukan / Penyemprotan Baru</span>
+                        <span class="text-[10px] text-slate-400 font-normal">Potong Keuangan Kebun</span>
+                    </h3>
+
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <label class="block font-semibold mb-1 text-slate-700">Pilih Jenis Pupuk / Perawatan</label>
+                            <select id="input-fert-jenis" onchange="updateFertilizerGuidance()" class="w-full p-2.5 bg-sageBg border border-softBorder rounded-xl text-xs font-semibold text-charcoal focus:ring-1 focus:ring-sagePrimary">
+                                <option value="Urea / ZA (Unsur Nitrogen N)">🍃⚡ Urea / ZA (Unsur Nitrogen N) - Kg/Pohon</option>
+                                <option value="Dolomit / RP (pH Tanah & Akar)">🪨⛰️ Dolomit / RP (pH Tanah & Akar) - Kg/Pohon</option>
+                                <option value="KCL / MOP (Pembobotan TBS)">⚖️🍊 KCL / MOP (Pembobotan TBS) - Kg/Pohon</option>
+                                <option value="NPK Compound (Nutrisi Seimbang)">🧪🌱 NPK Compound (Nutrisi Seimbang) - Kg/Pohon</option>
+                                <option value="Borate (Nutrisi Mikro BBR)">💎💧 Borate (Nutrisi Mikro BBR) - Gram/Pohon</option>
+                                <option value="Penyemprotan Herbisida CBA">🛑🌿 Penyemprotan Herbisida CBA - Total Liter</option>
+                            </select>
+                        </div>
+
+                        <!-- Dynamic Guidance Recommendation Box -->
+                        <div id="fert-guidance-box" class="bg-emeraldSoft/40 p-3 rounded-xl border border-emeraldSoft text-xs text-sagePrimary font-medium">
+                            <i class="fa-solid fa-lightbulb mr-1.5 text-amber-600"></i>
+                            <span id="fert-guidance-text">Sebaiknya aplikasi Urea dilakukan pada kondisi tanah lembab setelah hujan ringan.</span>
+                        </div>
+
+                        <!-- Dynamic Dosage Input (Dosis Per Pohon / Total Liter Herbisida) -->
+                        <div id="fert-dosis-container">
+                            <label id="label-fert-dosis" class="block font-semibold mb-1 text-slate-700">Dosis per Pohon (Kg/Pohon)</label>
+                            <input type="number" id="input-fert-dosis" min="0" placeholder="0.0" step="0.1" class="w-full p-2.5 bg-sageBg border border-softBorder rounded-xl text-xs focus:ring-1 focus:ring-sagePrimary">
+                        </div>
+
+                        <div id="fert-herbisida-container" class="hidden">
+                            <label class="block font-semibold mb-1 text-slate-700">Total Penggunaan Herbisida (Liter)</label>
+                            <input type="number" id="input-fert-herbisida-liter" min="0" placeholder="0.0" step="0.5" class="w-full p-2.5 bg-sageBg border border-softBorder rounded-xl text-xs focus:ring-1 focus:ring-sagePrimary">
+                            <p class="text-[10px] text-slate-400 mt-0.5">*Masukkan total liter herbisida yang habis dipakai untuk seluruh kebun Anda.</p>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block font-semibold mb-1 text-slate-700">Total Biaya Bahan / Pupuk (Rp)</label>
+                                <input type="number" id="input-fert-biaya-bahan" min="0" placeholder="0" class="w-full p-2.5 bg-sageBg border border-softBorder rounded-xl text-xs focus:ring-1 focus:ring-sagePrimary">
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold mb-1 text-slate-700">Ongkos Pekerja / Upah (Rp)</label>
+                                <input type="number" id="input-fert-biaya-kerja" min="0" placeholder="0" class="w-full p-2.5 bg-sageBg border border-softBorder rounded-xl text-xs focus:ring-1 focus:ring-sagePrimary">
+                            </div>
+                        </div>
+
+                        <button onclick="saveFertilizerEntry()" class="w-full bg-sagePrimary hover:bg-sageHover text-white py-3 rounded-xl text-xs font-semibold shadow-md transition-all flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>SIMPAN BIAYA PERAWATAN (Auto-Sync)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- History Maintenance Log Table -->
+                <div class="bg-white p-4 rounded-2xl border border-softBorder shadow-sm space-y-3">
+                    <h3 class="text-xs font-bold text-charcoal border-b border-softBorder pb-2 flex items-center justify-between">
+                        <span><i class="fa-solid fa-clock-rotate-left text-sagePrimary mr-1.5"></i> Riwayat Laporan Perawatan Kebun</span>
+                        <span class="text-[10px] text-slate-400 font-normal">Real-Time Cloud</span>
+                    </h3>
+                    <div id="fert-history-list" class="space-y-2 max-h-72 overflow-y-auto text-xs">
+                        <div class="text-center text-slate-400 py-6 text-xs">Belum ada riwayat laporan perawatan.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- HALAMAN 5: BIODATA PETANI & KEBUN SAWIT -->
+            <section id="page-5" class="page-view page-hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-base font-bold text-charcoal flex items-center">
+                            <i class="fa-solid fa-address-card text-sagePrimary mr-2"></i> HALAMAN 5: BIODATA PETANI & KEBUN
+                        </h2>
+                        <p class="text-xs text-slate-500">Profil Kepemilikan Lahan, Jumlah Pohon & Hak Cipta</p>
+                    </div>
+                    <button onclick="openPwaModal()" class="bg-sageLight text-sagePrimary text-[10px] font-bold px-2.5 py-1 rounded-lg border border-emeraldSoft hover:bg-emeraldSoft transition-all flex items-center space-x-1 no-print">
+                        <i class="fa-solid fa-download"></i>
+                        <span>UNDUH APP</span>
+                    </button>
+                </div>
+
+                <!-- Profile Card -->
+                <div class="bg-white p-5 rounded-2xl border border-softBorder shadow-sm text-center space-y-4">
+                    <div class="relative w-24 h-24 mx-auto">
+                        <img id="profile-avatar-img" src="https://placehold.co/120x120/2D5A27/FFFFFF?text=Sawit-Ku" class="w-24 h-24 rounded-full object-cover border-4 border-sageLight shadow-md" alt="Avatar">
+                        <label for="profile-photo-input" class="absolute bottom-0 right-0 bg-sagePrimary text-white w-8 h-8 rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:bg-sageHover transition-all">
+                            <i class="fa-solid fa-camera text-xs"></i>
+                        </label>
+                        <input type="file" id="profile-photo-input" accept="image/*" class="hidden" onchange="saveUserProfile()">
+                    </div>
+
+                    <div class="space-y-3 max-w-sm mx-auto text-xs">
+                        <div>
+                            <label class="block text-left text-[10px] font-bold text-slate-400 uppercase mb-1">Nama Pemilik Kebun / Petani</label>
+                            <input type="text" id="profile-display-name" placeholder="[Masukkan Nama Petani]" value="Petani Sawit-Ku" class="w-full text-left py-2 px-3 bg-sageBg border border-softBorder rounded-xl font-bold text-charcoal focus:ring-1 focus:ring-sagePrimary">
+                        </div>
+
+                        <div>
+                            <label class="block text-left text-[10px] font-bold text-slate-400 uppercase mb-1">Nama / Lokasi Kebun Sawit</label>
+                            <input type="text" id="profile-kebun-name" placeholder="[Masukkan Nama/Lokasi Kebun]" value="Kebun Sawit Mandiri" class="w-full text-left py-2 px-3 bg-sageBg border border-softBorder rounded-xl font-bold text-charcoal focus:ring-1 focus:ring-sagePrimary">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label class="block text-left text-[10px] font-bold text-slate-400 uppercase mb-1">Luas Lahan (Ha)</label>
+                                <input type="number" id="profile-luas-lahan" step="0.1" min="0" placeholder="0" class="w-full text-left py-2 px-3 bg-sageBg border border-softBorder rounded-xl font-bold text-charcoal focus:ring-1 focus:ring-sagePrimary">
+                            </div>
+                            <div>
+                                <label class="block text-left text-[10px] font-bold text-slate-400 uppercase mb-1">Jumlah Pohon Sawit</label>
+                                <input type="number" id="profile-pohon-count" min="0" placeholder="0" class="w-full text-left py-2 px-3 bg-sageBg border border-softBorder rounded-xl font-bold text-charcoal focus:ring-1 focus:ring-sagePrimary">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-left text-[10px] font-bold text-slate-400 uppercase mb-1">Nomor WhatsApp / Kontak HP</label>
+                            <input type="tel" id="profile-kontak-hp" placeholder="Contoh: 0812-3456-7890" class="w-full text-left py-2 px-3 bg-sageBg border border-softBorder rounded-xl font-medium text-charcoal focus:ring-1 focus:ring-sagePrimary">
+                        </div>
+
+                        <div class="pt-1 flex items-center justify-between text-[10px] bg-sageBg p-2.5 rounded-xl border border-softBorder">
+                            <span class="text-slate-500 font-medium">Status Penyimpanan:</span>
+                            <span class="bg-emeraldSoft text-sagePrimary font-bold px-2.5 py-0.5 rounded-full border border-sageAccent/30">
+                                Aktif Mandiri & Cloud Sync
+                            </span>
+                        </div>
+
+                        <button type="button" onclick="saveUserProfile()" class="w-full bg-sagePrimary hover:bg-sageHover text-white py-2.5 rounded-xl font-bold transition-all shadow-sm flex items-center justify-center space-x-1.5">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>Simpan Pembaruan Biodata</span>
+                        </button>
+                    </div>
+
+                    <div class="pt-3 border-t border-softBorder flex flex-col space-y-2 max-w-sm mx-auto">
+                        <button type="button" onclick="openBiodataModal()" class="w-full bg-sageBg hover:bg-slate-100 text-charcoal border border-softBorder py-2 rounded-xl font-semibold text-xs transition-all flex items-center justify-center space-x-1.5">
+                            <i class="fa-solid fa-pen-to-square text-sagePrimary"></i>
+                            <span>Ubah Biodata Kebun</span>
+                        </button>
+                        <button type="button" onclick="resetBiodataAndData()" class="w-full bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 py-2 rounded-xl font-semibold text-xs transition-all flex items-center justify-center space-x-1.5">
+                            <i class="fa-solid fa-rotate-left"></i>
+                            <span>Atur Ulang / Ganti Profil Petani</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Copyright Card -->
+                <div class="bg-sageLight p-4 rounded-2xl border border-emeraldSoft text-center space-y-1">
+                    <p class="text-xs font-bold text-sagePrimary">
+                        Diciptakan oleh Abdul Jalil.
+                    </p>
+                    <p class="text-[10px] text-slate-500">
+                        Seluruh Hak Cipta Dilindungi Undang-Undang.
+                    </p>
+                </div>
+            </section>
+        </main>
+
+        <!-- BOTTOM NAVIGATION BAR (5 HALAMAN) -->
+        <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-softBorder z-30 max-w-2xl mx-auto no-print">
+            <div class="grid grid-cols-5 h-16 text-[9px] font-medium text-slate-400">
+                <button onclick="switchTab(1)" id="tab-btn-1" class="flex flex-col items-center justify-center space-y-1 text-sagePrimary font-bold">
+                    <i class="fa-solid fa-flask text-base"></i>
+                    <span>Hal 1: Lab 3D</span>
+                </button>
+                <button onclick="switchTab(2)" id="tab-btn-2" class="flex flex-col items-center justify-center space-y-1 hover:text-sagePrimary">
+                    <i class="fa-solid fa-chart-pie text-base"></i>
+                    <span>Hal 2: Analisis</span>
+                </button>
+                <button onclick="switchTab(3)" id="tab-btn-3" class="flex flex-col items-center justify-center space-y-1 hover:text-sagePrimary">
+                    <i class="fa-solid fa-clipboard-list text-base"></i>
+                    <span>Hal 3: Panen</span>
+                </button>
+                <button onclick="switchTab(4)" id="tab-btn-4" class="flex flex-col items-center justify-center space-y-1 hover:text-sagePrimary">
+                    <i class="fa-solid fa-spray-can-sparkles text-base"></i>
+                    <span>Hal 4: Perawatan</span>
+                </button>
+                <button onclick="switchTab(5)" id="tab-btn-5" class="flex flex-col items-center justify-center space-y-1 hover:text-sagePrimary">
+                    <i class="fa-solid fa-user-gear text-base"></i>
+                    <span>Hal 5: Profil</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <!-- TOAST NOTIFICATION: COMPACT FLOATING POP-UP DENGAN TRANSISI MENARIK -->
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none w-full max-w-sm px-4 flex justify-center no-print">
+        <div id="toast" class="toast-hide pointer-events-auto bg-slate-900/95 backdrop-blur-md text-white border border-slate-700/60 shadow-xl rounded-2xl px-3 py-1.5 flex items-center space-x-2.5 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] max-w-[92vw] overflow-hidden relative">
+            <div id="toast-icon-wrapper" class="w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 text-[10px]">
+                <i id="toast-icon" class="fa-solid fa-circle-check"></i>
+            </div>
+            <div class="flex-1 min-w-0 pr-1">
+                <p id="toast-msg" class="text-[11px] font-semibold text-slate-100 leading-tight truncate">Notifikasi...</p>
+                <p id="toast-sub" class="text-[9px] text-slate-400 leading-none mt-0.5 hidden"></p>
+            </div>
+            <button type="button" onclick="dismissToast()" class="text-slate-400 hover:text-white text-[10px] p-0.5 shrink-0 -mr-0.5 transition-colors">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div id="toast-progress" class="absolute bottom-0 left-0 h-[2px] bg-emerald-400 transition-all duration-[2800ms] ease-linear w-full"></div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT APP LOGIC, THREE.JS 3D CANVAS & EXCEL EXPORTS -->
+    <script>
+        function switchTab(tabIndex) {
+            if (typeof playSound === 'function') playSound('sync');
+            for(let i=1; i<=5; i++) {
+                const page = document.getElementById(`page-${i}`);
+                const btn = document.getElementById(`tab-btn-${i}`);
+                
+                if (i === tabIndex) {
+                    if (page) page.classList.remove('page-hidden');
+                    if (btn) {
+                        btn.className = "flex flex-col items-center justify-center space-y-1 text-sagePrimary font-bold transition-all duration-200";
+                        const icon = btn.querySelector('i');
+                        if (icon) {
+                            icon.classList.remove('animate-bounce');
+                            void icon.offsetWidth;
+                            icon.classList.add('animate-bounce');
+                            setTimeout(() => icon.classList.remove('animate-bounce'), 400);
+                        }
+                    }
+                } else {
+                    if (page) page.classList.add('page-hidden');
+                    if (btn) btn.className = "flex flex-col items-center justify-center space-y-1 text-slate-400 hover:text-sagePrimary transition-all duration-200";
+                }
+            }
+        }
+
+        // Live Password Checklist
+        function validatePasswordLive() {
+            const pw = document.getElementById('auth-password').value;
+            const updateIndicator = (elemId, isMet) => {
+                const el = document.getElementById(elemId);
+                if (!el) return;
+                if (isMet) {
+                    el.className = 'flex items-center space-x-1.5 text-emerald-600 font-semibold';
+                    el.querySelector('i').className = 'fa-solid fa-circle-check text-xs text-emerald-600';
+                } else {
+                    el.className = 'flex items-center space-x-1.5 text-slate-400';
+                    el.querySelector('i').className = 'fa-solid fa-circle-check text-xs text-slate-300';
+                }
+            };
+
+            updateIndicator('req-len', pw.length >= 6);
+            updateIndicator('req-upper', /[A-Z]/.test(pw));
+            updateIndicator('req-lower', /[a-z]/.test(pw));
+            updateIndicator('req-num', /[0-9]/.test(pw));
+            updateIndicator('req-sym', /[^A-Za-z0-9]/.test(pw));
+        }
+
+        function togglePasswordVisibility() {
+            const pwInput = document.getElementById('auth-password');
+            const toggleText = document.getElementById('pw-toggle-text');
+            if (!pwInput) return;
+            if (pwInput.type === 'password') {
+                pwInput.type = 'text';
+                toggleText.innerText = 'Sembunyikan';
+            } else {
+                pwInput.type = 'password';
+                toggleText.innerText = 'Lihat Sandi';
+            }
+        }
+
+        window.openFirebaseConfigModal = function() {
+            showToast("Firebase Sawit-Ku sudah aktif dan terhubung otomatis.");
+        };
+
+        // PWA Prompts
+        let deferredInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', (event) => {
+            event.preventDefault();
+            deferredInstallPrompt = event;
+            const label = document.getElementById('pwa-install-action-label');
+            if (label) label.textContent = 'Install Aplikasi';
+            const installButton = document.getElementById('pwa-install-action');
+            if (installButton) installButton.classList.remove('hidden');
+        });
+
+        window.addEventListener('appinstalled', () => {
+            deferredInstallPrompt = null;
+            playSound('success');
+            showToast('Sawit-Ku berhasil dipasang di perangkat.');
+            closePwaModal();
+        });
+
+        async function openPwaModal() {
+            document.getElementById('pwa-install-modal').classList.remove('hidden');
+            const installButton = document.getElementById('pwa-install-action');
+            if (installButton) installButton.classList.toggle('hidden', !deferredInstallPrompt);
+        }
+
+        async function installSawitPwa() {
+            if (!deferredInstallPrompt) return;
+            deferredInstallPrompt.prompt();
+            await deferredInstallPrompt.userChoice;
+            deferredInstallPrompt = null;
+            const installButton = document.getElementById('pwa-install-action');
+            if (installButton) installButton.classList.add('hidden');
+        }
+
+        function closePwaModal() { 
+            document.getElementById('pwa-install-modal').classList.add('hidden'); 
+        }
+
+        window.openPwaModal = openPwaModal;
+        window.closePwaModal = closePwaModal;
+        window.installSawitPwa = installSawitPwa;
+
+        if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js')
+                .then(registration => console.info('Sawit-Ku service worker terdaftar:', registration.scope))
+                .catch(error => console.warn('Service worker tidak dapat didaftarkan:', error)));
+        }
+
+        function startRealtimeClock() {
+            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+            const updateClock = () => {
+                const now = new Date();
+                const dayName = days[now.getDay()];
+                const dateNum = now.getDate();
+                const monthName = months[now.getMonth()];
+                const yearNum = now.getFullYear();
+
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+
+                const dateEl = document.getElementById('realtime-date-text');
+                const timeEl = document.getElementById('realtime-time-text');
+                if (dateEl) dateEl.innerText = `${dayName}, ${dateNum} ${monthName} ${yearNum}`;
+                if (timeEl) timeEl.innerText = `${hours}:${minutes}:${seconds} WIB`;
+            };
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        function initGPSWeather() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(async (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+
+                    try {
+                        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                        const geoData = await geoRes.json();
+                        const address = geoData.address || {};
+                        const city = address.village || address.town || address.city || address.suburb || address.county || address.state || 'Lokasi kebun';
+
+                        const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+                        const weatherData = await weatherRes.json();
+                        const current = weatherData.current_weather || weatherData.current;
+                        document.getElementById('gps-location-text').innerText = city;
+                        document.getElementById('gps-weather-text').innerText = current && Number.isFinite(current.temperature)
+                            ? `${current.temperature}°C | Terpantau`
+                            : 'Cuaca tidak tersedia';
+                    } catch (e) {
+                        document.getElementById('gps-location-text').innerText = 'Lokasi GPS Aktif';
+                        document.getElementById('gps-weather-text').innerText = 'Data cuaca offline';
+                    }
+                }, () => {
+                    document.getElementById('gps-location-text').innerText = 'Lokasi Manual';
+                    document.getElementById('gps-weather-text').innerText = 'Aktifkan izin GPS';
+                }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+            } else {
+                document.getElementById('gps-location-text').innerText = 'GPS Tidak Didukung';
+                document.getElementById('gps-weather-text').innerText = 'Masukkan cuaca manual';
+            }
+        }
+
+        // Three.js 3D Simulation Canvas
+        let scene, camera, renderer, leavesGroup, trunkMesh;
+
+        function init3DCanvas() {
+            const container = document.getElementById('canvas3d-container');
+            if (!container) return;
+            if (typeof THREE === 'undefined') {
+                container.innerHTML = '<div style="padding:24px;text-align:center;color:#2D5A27;font-size:12px">Visualisasi 3D membutuhkan koneksi untuk memuat Three.js. Formulir dan neraca tetap dapat digunakan penuh.</div>';
+                return;
+            }
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xE8F2E8);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(0, 3, 7);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+            dirLight.position.set(5, 10, 5);
+            scene.add(dirLight);
+
+            // Tanah Piringan Kebun
+            const groundGeo = new THREE.CylinderGeometry(2.5, 2.5, 0.2, 32);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x8B5A2B });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.position.y = -1;
+            scene.add(ground);
+
+            // Batang Kelapa Sawit Bertekstur Pelepah
+            const trunkGeo = new THREE.CylinderGeometry(0.2, 0.35, 3, 16);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5C4033, roughness: 0.9 });
+            trunkMesh = new THREE.Mesh(trunkGeo, trunkMat);
+            trunkMesh.position.y = 0.5;
+            scene.add(trunkMesh);
+
+            leavesGroup = new THREE.Group();
+            leavesGroup.position.y = 2.0;
+
+            const leafCount = 12;
+            for(let i=0; i<leafCount; i++) {
+                const angle = (i / leafCount) * Math.PI * 2;
+                const leafGeo = new THREE.ConeGeometry(0.25, 2.2, 8);
+                const leafMat = new THREE.MeshStandardMaterial({ color: 0x2D5A27, roughness: 0.6 });
+                const leaf = new THREE.Mesh(leafGeo, leafMat);
+
+                leaf.rotation.z = Math.PI / 3;
+                leaf.rotation.y = angle;
+                leavesGroup.add(leaf);
+            }
+            scene.add(leavesGroup);
+
+            let isDragging = false;
+            let previousMouseX = 0;
+
+            container.addEventListener('mousedown', (e) => { isDragging = true; previousMouseX = e.clientX; });
+            window.addEventListener('mouseup', () => { isDragging = false; });
+            container.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const deltaX = e.clientX - previousMouseX;
+                    leavesGroup.rotation.y += deltaX * 0.01;
+                    trunkMesh.rotation.y += deltaX * 0.01;
+                    ground.rotation.y += deltaX * 0.01;
+                    previousMouseX = e.clientX;
+                }
+            });
+
+            container.addEventListener('touchstart', (e) => { isDragging = true; previousMouseX = e.touches[0].clientX; });
+            window.addEventListener('touchend', () => { isDragging = false; });
+            container.addEventListener('touchmove', (e) => {
+                if (isDragging) {
+                    const deltaX = e.touches[0].clientX - previousMouseX;
+                    leavesGroup.rotation.y += deltaX * 0.01;
+                    trunkMesh.rotation.y += deltaX * 0.01;
+                    ground.rotation.y += deltaX * 0.01;
+                    previousMouseX = e.touches[0].clientX;
+                }
+            });
+
+            // Handle resize container
+            window.addEventListener('resize', () => {
+                if (!container || !renderer || !camera) return;
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+
+            function animate() {
+                requestAnimationFrame(animate);
+                if (!isDragging && leavesGroup) {
+                    leavesGroup.rotation.y += 0.003;
+                }
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+
+        function updateSimulation() {
+            const urea = Math.max(0, parseFloat(document.getElementById('slider-urea').value) || 0);
+            const dolomit = Math.max(0, parseFloat(document.getElementById('slider-dolomit').value) || 0);
+            const kcl = Math.max(0, parseFloat(document.getElementById('slider-kcl').value) || 0);
+            const npk = Math.max(0, parseFloat(document.getElementById('slider-npk').value) || 0);
+            const borate = Math.max(0, parseFloat(document.getElementById('slider-borate').value) || 0);
+            const cba = Math.max(0, parseFloat(document.getElementById('slider-cba').value) || 0);
+            
+            const hujan = Math.max(0, parseInt(document.getElementById('slider-hujan').value) || 0);
+            const panas = Math.max(0, parseInt(document.getElementById('slider-panas').value) || 0);
+            const suhu = Math.max(0, parseInt(document.getElementById('slider-suhu').value) || 0);
+
+            document.getElementById('val-urea').innerText = `${urea.toFixed(1)} kg/pohon`;
+            document.getElementById('val-dolomit').innerText = `${dolomit.toFixed(1)} kg/pohon`;
+            document.getElementById('val-kcl').innerText = `${kcl.toFixed(1)} kg/pohon`;
+            document.getElementById('val-npk').innerText = `${npk.toFixed(1)} kg/pohon`;
+            document.getElementById('val-borate').innerText = `${borate} gram/pohon`;
+            document.getElementById('val-cba').innerText = `${cba} ml/tanki`;
+
+            document.getElementById('val-hujan').innerText = `${hujan}% (${hujan > 75 ? 'Lebat' : hujan < 30 ? 'Kering' : 'Normal'})`;
+            document.getElementById('val-panas').innerText = `${panas} Hari`;
+            document.getElementById('val-suhu').innerText = `${suhu} °C`;
+
+            let yieldBase = 450;
+            let fertFactor = (urea + kcl + npk) / 5.5;
+            if (urea > 2.5) fertFactor *= 0.85;
+            
+            let weatherFactor = 1.0;
+            if (hujan > 80) weatherFactor = 0.8;
+            else if (hujan < 20 || panas > 22) weatherFactor = 0.75;
+
+            let calculatedYield = yieldBase * fertFactor * weatherFactor;
+            let calculatedBjr = 6.0 + (kcl * 1.5) + (borate / 100);
+
+            if (calculatedYield < 0) calculatedYield = 0;
+            if (calculatedBjr > 16) calculatedBjr = 16.0;
+
+            document.getElementById('sim-pred-yield').innerText = `${calculatedYield.toFixed(1)} Kg`;
+            document.getElementById('sim-bjr').innerText = `${calculatedBjr.toFixed(1)} Kg`;
+
+            if (leavesGroup) {
+                leavesGroup.children.forEach(leaf => {
+                    if (urea > 2.4) {
+                        leaf.material.color.setHex(0xB8860B);
+                    } else if (urea < 0.5) {
+                        leaf.material.color.setHex(0x9ACD32);
+                    } else {
+                        leaf.material.color.setHex(0x2D5A27);
+                    }
+                });
+            }
+
+            const statusEl = document.getElementById('sim-status');
+            const narrativeMain = document.getElementById('narrative-text-main');
+            const narrativeTips = document.getElementById('narrative-tips');
+
+            if (urea > 2.4) {
+                statusEl.innerText = "OVERDOSIS";
+                statusEl.className = "font-bold text-red-600 text-xs";
+                narrativeMain.innerText = `⚠️ Racikan Nitrogen (${urea} kg/pohon) terlalu tinggi! Berisiko menyebabkan terbakar vegetatif dan piringan menjadi asam.`;
+                narrativeTips.innerHTML = `<b>Rekomendasi Tindakan:</b> Turunkan dosis Urea/ZA dan imbangi dengan Dolomit untuk menetralkan pH tanah.`;
+            } else if (hujan < 25 || panas > 22) {
+                statusEl.innerText = "STRES AIR";
+                statusEl.className = "font-bold text-amber-600 text-xs";
+                narrativeMain.innerText = `☀️ Curah hujan rendah (${hujan}%) dan kemarau (${panas} Hari). Tanaman mengalami stres air sehingga penyerapan pupuk KCL kurang maksimal.`;
+                narrativeTips.innerHTML = `<b>Rekomendasi Tindakan:</b> Tunda pemupukan kimia hingga curah hujan stabil di atas 40% agar pupuk tidak menguap sia-sia.`;
+            } else {
+                statusEl.innerText = "BELUM ADA DATA";
+                statusEl.className = "font-bold text-emerald-600 text-xs";
+                narrativeMain.innerText = `🌱 Keseimbangan nutrisi dan agroklimatologi sangat seimbang. Prediksi bobot janjang (BJR ${calculatedBjr.toFixed(1)} Kg) berpotensi mencapai tonase puncak.`;
+                narrativeTips.innerHTML = `<b>Rekomendasi Tindakan:</b> Pertahankan jadwal pemupukan rutin dan pastikan piringan bebas semak.`;
+            }
+        }
+
+        function resetSliders() {
+            document.getElementById('slider-urea').value = 0;
+            document.getElementById('slider-dolomit').value = 0;
+            document.getElementById('slider-kcl').value = 0;
+            document.getElementById('slider-npk').value = 0;
+            document.getElementById('slider-borate').value = 0;
+            document.getElementById('slider-cba').value = 0;
+            document.getElementById('slider-hujan').value = 0;
+            document.getElementById('slider-panas').value = 0;
+            document.getElementById('slider-suhu').value = 0;
+            updateSimulation();
+        }
+
+        function calculateHarvestPreview() {
+            const jjg = Math.max(0, parseFloat(document.getElementById('input-harvest-jjg').value) || 0);
+            const totalKg = Math.max(0, parseFloat(document.getElementById('input-harvest-kg').value) || 0);
+            const harga = Math.max(0, parseFloat(document.getElementById('input-harvest-harga').value) || 0);
+            const ongkos = Math.max(0, parseFloat(document.getElementById('input-harvest-ongkos').value) || 0);
+
+            const bjr = jjg > 0 ? (totalKg / jjg).toFixed(1) : "0.0";
+            const kotor = totalKg * harga;
+            const totalOngkos = totalKg * ongkos;
+            const bersih = Math.max(0, kotor - totalOngkos);
+
+            document.getElementById('prev-harvest-bjr').innerText = `${bjr} Kg/JJG`;
+            document.getElementById('prev-harvest-kotor').innerText = `Rp ${kotor.toLocaleString('id-ID')}`;
+            document.getElementById('prev-harvest-ongkos').innerText = `Rp ${totalOngkos.toLocaleString('id-ID')}`;
+            document.getElementById('prev-harvest-bersih').innerText = `Rp ${bersih.toLocaleString('id-ID')}`;
+        }
+
+        function updateFertilizerGuidance() {
+            const jenis = document.getElementById('input-fert-jenis').value;
+            const containerDosis = document.getElementById('fert-dosis-container');
+            const containerHerbisida = document.getElementById('fert-herbisida-container');
+            const labelDosis = document.getElementById('label-fert-dosis');
+            const guidanceText = document.getElementById('fert-guidance-text');
+
+            if (jenis === 'Penyemprotan Herbisida CBA') {
+                containerDosis.classList.add('hidden');
+                containerHerbisida.classList.remove('hidden');
+                guidanceText.innerText = "Sebaiknya penyemprotan rumput herbisida CBA dilakukan pada pagi hari saat tidak ada hujan agar bahan aktif terserap sempurna oleh gulma piringan.";
+            } else {
+                containerDosis.classList.remove('hidden');
+                containerHerbisida.classList.add('hidden');
+
+                if (jenis.includes('Urea')) {
+                    labelDosis.innerText = "Dosis per Pohon (Kg/Pohon)";
+                    guidanceText.innerText = "Sebaiknya aplikasi Urea dilakukan pada kondisi tanah lembab setelah hujan ringan agar unsur Nitrogen tidak menguap.";
+                } else if (jenis.includes('Dolomit')) {
+                    labelDosis.innerText = "Dosis per Pohon (Kg/Pohon)";
+                    guidanceText.innerText = "Sebaiknya Dolomit ditabur 2 minggu sebelum pupuk kimia lainnya untuk menetralkan asam tanah secara efektif.";
+                } else if (jenis.includes('KCL')) {
+                    labelDosis.innerText = "Dosis per Pohon (Kg/Pohon)";
+                    guidanceText.innerText = "Sebaiknya KCL diberikan tepat di piringan bersih untuk memaksimalkan pembobotan minyak & kepadatan buah TBS.";
+                } else if (jenis.includes('NPK')) {
+                    labelDosis.innerText = "Dosis per Pohon (Kg/Pohon)";
+                    guidanceText.innerText = "Sebaiknya NPK ditabur merata melingkar 1.5 meter dari pangkal batang pohon.";
+                } else if (jenis.includes('Borate')) {
+                    labelDosis.innerText = "Dosis per Pohon (Gram/Pohon)";
+                    guidanceText.innerText = "Sebaiknya Borate ditabur di ketiak pelepah muda untuk mencegah daun keriting & memicu pembentukan bunga betina.";
+                }
+            }
+        }
+
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function renderHarvestHistory(reports) {
+            const container = document.getElementById('harvest-history-list');
+            if (!container) return;
+
+            if (!reports || reports.length === 0) {
+                container.innerHTML = `<div class="text-center text-slate-400 py-6 text-xs">Belum ada riwayat laporan panen.</div>`;
+                return;
+            }
+
+            reports.sort((a,b) => (b.createdMillis || 0) - (a.createdMillis || 0));
+
+            container.innerHTML = reports.map(r => `
+                <div class="bg-sageBg p-3 rounded-xl border border-softBorder flex items-center justify-between hover:border-emerald-300 transition">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-bold text-charcoal text-xs">${escapeHtml(r.timestamp)}</span>
+                            <span class="text-[9px] bg-emeraldSoft text-sagePrimary px-2 py-0.5 rounded-full font-bold">${escapeHtml(r.bjr || 0)} Kg/JJG</span>
+                        </div>
+                        <p class="text-[10px] text-slate-500 mt-0.5">Hasil Kotor: Rp ${(Number(r.kotor) || 0).toLocaleString('id-ID')} | Ongkos: Rp ${(Number(r.ongkos) || 0).toLocaleString('id-ID')}</p>
+                    </div>
+                    <div class="flex items-center space-x-2.5">
+                        <div class="text-right">
+                            <p class="text-xs font-bold text-bersihText">Rp ${(Number(r.bersih) || 0).toLocaleString('id-ID')}</p>
+                            <p class="text-[10px] text-slate-500">${Number(r.totalKg) || 0} Kg (${Number(r.jjg) || 0} JJG)</p>
+                            ${Number(r.hilangJjg) > 0 ? `<p class="text-[9px] text-red-600 font-bold">Hilang: ${Number(r.hilangJjg)} JJG</p>` : ''}
+                        </div>
+                        <button onclick="deleteHarvestEntry('${escapeHtml(r.id)}', '${escapeHtml(r.timestamp)}')" title="Hapus Laporan Panen Ini" class="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition no-print">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderFertilizerHistory(reports) {
+            const container = document.getElementById('fert-history-list');
+            if (!container) return;
+
+            if (!reports || reports.length === 0) {
+                container.innerHTML = `<div class="text-center text-slate-400 py-6 text-xs">Belum ada riwayat laporan perawatan.</div>`;
+                return;
+            }
+
+            reports.sort((a,b) => (b.createdMillis || 0) - (a.createdMillis || 0));
+
+            container.innerHTML = reports.map(r => `
+                <div class="bg-sageBg p-3 rounded-xl border border-softBorder flex items-center justify-between hover:border-emerald-300 transition">
+                    <div>
+                        <span class="font-bold text-charcoal text-xs">${escapeHtml(r.jenis || 'Perawatan')}</span>
+                        <p class="text-[10px] text-slate-400 mt-0.5">${escapeHtml(r.timestamp)}</p>
+                        <p class="text-[10px] text-slate-500">Bahan: Rp ${(Number(r.biayaBahan) || 0).toLocaleString('id-ID')} | Upah: Rp ${(Number(r.biayaKerja) || 0).toLocaleString('id-ID')}</p>
+                    </div>
+                    <div class="flex items-center space-x-2.5">
+                        <div class="text-right">
+                            <p class="text-xs font-bold text-rawatText">Total: Rp ${(Number(r.totalBiayaRawat) || 0).toLocaleString('id-ID')}</p>
+                            <p class="text-[10px] text-sagePrimary font-medium">${r.totalLiterHerbisida ? `${escapeHtml(r.totalLiterHerbisida)} Liter Total` : `${Number(r.dosisPohon) || 0} / Pohon`}</p>
+                        </div>
+                        <button onclick="deleteFertilizerEntry('${escapeHtml(r.id)}', '${escapeHtml(r.jenis)}', '${escapeHtml(r.timestamp)}')" title="Hapus Laporan Perawatan Ini" class="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition no-print">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        let trendChartInstance = null;
+
+        function reportDate(report) {
+            if (Number.isFinite(report.createdMillis)) return new Date(report.createdMillis);
+            if (Number.isFinite(report.year) && report.monthName) {
+                const monthIndex = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'].indexOf(report.monthName);
+                if (monthIndex >= 0) return new Date(report.year, monthIndex, Number(report.dayDate) || 1);
+            }
+            return null;
+        }
+
+        function updateGlobalAnalytics() {
+            const harvestReports = window.userHarvestData || [];
+            const fertReports = window.userFertilizerData || [];
+            let sumKotor = 0, sumOngkosPanen = 0, sumTotalKg = 0, sumTotalJjg = 0, sumHilangJjg = 0, lossRp = 0;
+            harvestReports.forEach(r => {
+                sumKotor += Number(r.kotor) || 0;
+                sumOngkosPanen += Number(r.ongkos) || 0;
+                sumTotalKg += Number(r.totalKg) || 0;
+                sumTotalJjg += Number(r.jjg) || 0;
+                const hilang = Math.max(0, Number(r.hilangJjg) || 0);
+                sumHilangJjg += hilang;
+                const bjrRecord = Number(r.bjr) > 0 ? Number(r.bjr) : ((Number(r.jjg) > 0) ? (Number(r.totalKg) || 0) / Number(r.jjg) : 0);
+                const hargaRecord = Number(r.hargaPerKg) || 0;
+                if (bjrRecord > 0 && hargaRecord > 0) lossRp += hilang * bjrRecord * hargaRecord;
+            });
+            const sumBiayaRawat = fertReports.reduce((sum, r) => sum + (Number(r.totalBiayaRawat) || 0), 0);
+            const uangBersih = sumKotor - sumOngkosPanen - sumBiayaRawat;
+            const avgBjr = sumTotalJjg > 0 ? (sumTotalKg / sumTotalJjg) : 0;
+            
+            document.getElementById('neraca-kotor').innerText = `Rp ${sumKotor.toLocaleString('id-ID')}`;
+            document.getElementById('neraca-ongkos-panen').innerText = `Rp ${sumOngkosPanen.toLocaleString('id-ID')}`;
+            document.getElementById('neraca-biaya-rawat').innerText = `Rp ${sumBiayaRawat.toLocaleString('id-ID')}`;
+            document.getElementById('neraca-uang-bersih').innerText = `Rp ${uangBersih.toLocaleString('id-ID')}`;
+            document.getElementById('ana-bjr-val').innerText = avgBjr > 0 ? `${avgBjr.toFixed(1)} Kg` : '0.0 Kg';
+            document.getElementById('ana-total-kg').innerText = `${sumTotalKg.toLocaleString('id-ID')} Kg`;
+            document.getElementById('ana-total-jjg').innerText = `Dari ${sumTotalJjg.toLocaleString('id-ID')} Janjang`;
+            document.getElementById('ana-hilang-jjg').innerText = `${sumHilangJjg.toLocaleString('id-ID')} Janjang`;
+            document.getElementById('ana-hilang-rp').innerText = `Rp ${Math.round(lossRp).toLocaleString('id-ID')}`;
+            
+            renderMonthlyTrendChart(harvestReports, fertReports);
+        }
+
+        function renderMonthlyTrendChart(harvestReports, fertReports) {
+            const ctx = document.getElementById('monthlyTrendChart');
+            if (!ctx || typeof Chart === 'undefined') return;
+            const now = new Date();
+            const periods = [];
+            for (let offset = 11; offset >= 0; offset--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+                const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+                periods.push({ key, label: d.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }), gross: 0, net: 0 });
+            }
+            const byKey = new Map(periods.map(p => [p.key, p]));
+            harvestReports.forEach(r => {
+                const d = reportDate(r); if (!d || Number.isNaN(d.getTime())) return;
+                const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+                const period = byKey.get(key); if (!period) return;
+                period.gross += Number(r.kotor) || 0;
+                period.net += (Number(r.kotor) || 0) - (Number(r.ongkos) || 0);
+            });
+            fertReports.forEach(r => {
+                const d = reportDate(r); if (!d || Number.isNaN(d.getTime())) return;
+                const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+                const period = byKey.get(key); if (period) period.net -= Number(r.totalBiayaRawat) || 0;
+            });
+            if (trendChartInstance) trendChartInstance.destroy();
+            trendChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: { 
+                    labels: periods.map(p => p.label), 
+                    datasets: [
+                        { label: 'Hasil Kotor (Rp)', data: periods.map(p => p.gross), backgroundColor: '#A8C686' },
+                        { label: 'Laba Bersih (Rp)', data: periods.map(p => p.net), backgroundColor: '#2D5A27' }
+                    ] 
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    scales: { 
+                        y: { 
+                            ticks: { 
+                                callback: value => 'Rp ' + Number(value).toLocaleString('id-ID'), 
+                                font: { size: 9 } 
+                            } 
+                        }, 
+                        x: { 
+                            ticks: { font: { size: 9 } } 
+                        } 
+                    },
+                    plugins: { 
+                        legend: { labels: { font: { size: 10 } } } 
+                    }
+                }
+            });
+        }
+
+        // Download Excel Spreadsheet Berformat Resmi (.xls) dengan Styling Penuh & Formula Kompatibel
+        function downloadExcelFile(filename, htmlTableContent) {
+            const excelTemplate = `
+                <html xmlns:o="urn:schemas-microsoft-com:office:office" 
+                      xmlns:x="urn:schemas-microsoft-com:office:excel" 
+                      xmlns="http://www.w3.org/TR/REC-html40">
+                <head>
+                    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+                    <!--[if gte mso 9]>
+                    <xml>
+                        <x:ExcelWorkbook>
+                            <x:ExcelWorksheets>
+                                <x:ExcelWorksheet>
+                                    <x:Name>Laporan Sawit-Ku</x:Name>
+                                    <x:WorksheetOptions>
+                                        <x:DisplayGridlines/>
+                                    </x:WorksheetOptions>
+                                </x:ExcelWorksheet>
+                            </x:ExcelWorksheets>
+                        </x:ExcelWorkbook>
+                    </xml>
+                    <![endif]-->
+                    <style>
+                        body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; font-size: 11pt; color: #1e293b; }
+                        table { border-collapse: collapse; margin-bottom: 24px; width: 100%; }
+                        th { background-color: #2D5A27; color: #ffffff; font-weight: bold; border: 1px solid #1e3d1a; padding: 10px 14px; text-align: center; vertical-align: middle; }
+                        td { border: 1px solid #cbd5e1; padding: 7px 12px; font-size: 11pt; vertical-align: middle; }
+                        .text-left { text-align: left; }
+                        .text-center { text-align: center; }
+                        .text-right { text-align: right; }
+                        .num-int { mso-number-format: "\\#\\,\\#\\#0"; text-align: right; }
+                        .num-dec { mso-number-format: "0\\.0"; text-align: center; }
+                        .curr { mso-number-format: "\"Rp \"\\#\\,\\#\\#0"; text-align: right; font-weight: 500; }
+                        .total-row { background-color: #e8f5e9; font-weight: bold; border-top: 2px solid #2D5A27; border-bottom: 2px solid #2D5A27; }
+                        .title-banner { background-color: #2D5A27; color: #ffffff; font-size: 14pt; font-weight: bold; padding: 14px; text-align: center; }
+                        .sub-banner { background-color: #f1f5f9; color: #475569; font-size: 10pt; padding: 8px 14px; text-align: center; }
+                        .kpi-table th { background-color: #1e3d1a; }
+                        .kpi-label { background-color: #f8fafc; font-weight: bold; color: #334155; }
+                        .kpi-profit { background-color: #dcfce7; font-weight: bold; color: #166534; font-size: 12pt; }
+                        .kpi-loss { background-color: #fee2e2; font-weight: bold; color: #991b1b; }
+                        .row-alt { background-color: #f8faf8; }
+                    </style>
+                </head>
+                <body>
+                    ${htmlTableContent}
+                </body>
+                </html>
+            `;
+
+            const blob = new Blob(['\ufeff', excelTemplate], { type: 'application/vnd.ms-excel;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
+            if (typeof playSound === 'function') playSound('sync');
+            showToast('Laporan Excel berhasil diunduh (.xls)', 'success');
+        }
+
+        // Ekspor CSV Standar jika diperlukan
+        function downloadCsv(filename, csvText) {
+            const blob = new Blob(['\ufeff', csvText], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url; 
+            link.download = filename;
+            document.body.appendChild(link); 
+            link.click(); 
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            if (typeof playSound === 'function') playSound('sync');
+        }
+
+        // EXCEL 1: NERACA KEUANGAN LENGKAP KEBUN
+        window.exportFinancialBalanceToExcel = function() {
+            const harvestReports = window.userHarvestData || [];
+            const fertReports = window.userFertilizerData || [];
+
+            let sumKotor = 0, sumOngkosPanen = 0, sumTotalKg = 0, sumTotalJjg = 0, sumHilangJjg = 0, lossRp = 0;
+            harvestReports.forEach(r => {
+                sumKotor += Number(r.kotor) || 0;
+                sumOngkosPanen += Number(r.ongkos) || 0;
+                sumTotalKg += Number(r.totalKg) || 0;
+                sumTotalJjg += Number(r.jjg) || 0;
+                const hilang = Math.max(0, Number(r.hilangJjg) || 0);
+                sumHilangJjg += hilang;
+                const bjrRecord = Number(r.bjr) > 0 ? Number(r.bjr) : ((Number(r.jjg) > 0) ? (Number(r.totalKg) || 0) / Number(r.jjg) : 0);
+                const hargaRecord = Number(r.hargaPerKg) || 0;
+                if (bjrRecord > 0 && hargaRecord > 0) lossRp += hilang * bjrRecord * hargaRecord;
+            });
+
+            let sumBiayaBahan = 0, sumBiayaKerja = 0, sumBiayaRawat = 0;
+            fertReports.forEach(r => {
+                sumBiayaBahan += Number(r.biayaBahan) || 0;
+                sumBiayaKerja += Number(r.biayaKerja) || 0;
+                sumBiayaRawat += Number(r.totalBiayaRawat) || 0;
+            });
+
+            const uangBersih = sumKotor - sumOngkosPanen - sumBiayaRawat;
+            const avgBjr = sumTotalJjg > 0 ? (sumTotalKg / sumTotalJjg).toFixed(1) : '0.0';
+            const bio = window.currentBiodata || (window.getSavedPetaniBiodata ? window.getSavedPetaniBiodata() : null) || {};
+            const namaPetani = bio.namaPetani || (window.currentUser && window.currentUser.displayName) || 'Abdul Jalil';
+            const namaKebun = bio.namaKebun || 'Kebun Sawit Mandiri';
+            const luasStr = bio.luasLahan ? `${bio.luasLahan} Ha` : '-';
+            const exportDate = new Date().toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' });
+
+            let html = `
+                <!-- HEADER LAPORAN -->
+                <table>
+                    <tr>
+                        <td colspan="10" class="title-banner">NERACA KEUANGAN KEBUN KELAPA SAWIT (SAWIT-KU)</td>
+                    </tr>
+                    <tr>
+                        <td colspan="10" class="sub-banner">
+                            Diciptakan oleh: <b>Abdul Jalil</b> &bull; Pemilik Kebun: <b>${escapeHtml(namaPetani)}</b> &bull; Lokasi Kebun: <b>${escapeHtml(namaKebun)} (${escapeHtml(luasStr)})</b> &bull; Dicetak: <b>${escapeHtml(exportDate)}</b>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- TABEL RINGKASAN EKSEKUTIF NERACA -->
+                <table>
+                    <tr>
+                        <th colspan="4" style="background-color: #1e3d1a;">RINGKASAN EKSEKUTIF NERACA KEUANGAN KEBUN</th>
+                    </tr>
+                    <tr>
+                        <td class="kpi-label" style="width: 35%;">Total Hasil Kotor Panen (TBS)</td>
+                        <td class="curr" style="width: 25%; font-weight: bold; color: #047857;">${sumKotor}</td>
+                        <td class="kpi-label" style="width: 25%;">Total Berat Timbangan</td>
+                        <td class="text-right bold" style="width: 15%;">${sumTotalKg.toLocaleString('id-ID')} Kg</td>
+                    </tr>
+                    <tr>
+                        <td class="kpi-label">Total Pengeluaran Ongkos Pekerja Panen</td>
+                        <td class="curr" style="color: #b91c1c;">${sumOngkosPanen}</td>
+                        <td class="kpi-label">Total Janjang Dipanen</td>
+                        <td class="text-right bold">${sumTotalJjg.toLocaleString('id-ID')} JJG</td>
+                    </tr>
+                    <tr>
+                        <td class="kpi-label">Total Biaya Perawatan & Pemupukan</td>
+                        <td class="curr" style="color: #b45309;">${sumBiayaRawat}</td>
+                        <td class="kpi-label">Rata-rata BJR Kebun</td>
+                        <td class="text-center bold">${avgBjr} Kg/JJG</td>
+                    </tr>
+                    <tr class="kpi-profit">
+                        <td style="font-size: 12pt;">LABA BERSIH KEBUN (NETT HASIL AKHIR)</td>
+                        <td class="curr" style="font-size: 12pt; color: #15803d;">${uangBersih}</td>
+                        <td class="kpi-label">Status Keuangan</td>
+                        <td class="text-center bold" style="color: #15803d;">${uangBersih >= 0 ? 'SURPLUS / UNTUNG' : 'DEFISIT'}</td>
+                    </tr>
+                    <tr class="kpi-loss">
+                        <td>Estimasi Tandan Hilang / Maling (Kebocoran TBS)</td>
+                        <td class="text-center bold">${sumHilangJjg.toLocaleString('id-ID')} JJG</td>
+                        <td>Potensi Kerugian TBS Hilang</td>
+                        <td class="curr">${Math.round(lossRp)}</td>
+                    </tr>
+                </table>
+
+                <br/>
+
+                <!-- TABEL 1: BUKU BESAR RINCIAN PANEN -->
+                <table>
+                    <tr>
+                        <th colspan="10" style="background-color: #2D5A27; font-size: 12pt;">TABEL 1: BUKU BESAR CATATAN PANEN 2-MINGGUAN</th>
+                    </tr>
+                    <tr>
+                        <th style="width: 4%;">No</th>
+                        <th style="width: 18%;">Tanggal & Waktu Panen</th>
+                        <th style="width: 10%;">Janjang (JJG)</th>
+                        <th style="width: 10%;">Berat (Kg)</th>
+                        <th style="width: 8%;">BJR</th>
+                        <th style="width: 11%;">Harga/Kg</th>
+                        <th style="width: 13%;">Hasil Kotor</th>
+                        <th style="width: 12%;">Ongkos Panen</th>
+                        <th style="width: 14%;">Uang Bersih (Nett)</th>
+                        <th style="width: 10%;">Hilang (JJG)</th>
+                    </tr>
+            `;
+
+            if (harvestReports.length === 0) {
+                html += `<tr><td colspan="10" class="text-center" style="color: #64748b; padding: 14px;">Belum ada data riwayat panen yang dicatat.</td></tr>`;
+            } else {
+                harvestReports.forEach((r, idx) => {
+                    const rowClass = idx % 2 === 1 ? 'class="row-alt"' : '';
+                    html += `
+                        <tr ${rowClass}>
+                            <td class="text-center">${idx + 1}</td>
+                            <td class="text-left">${escapeHtml(r.timestamp || '-')}</td>
+                            <td class="num-int">${Number(r.jjg) || 0}</td>
+                            <td class="num-int">${Number(r.totalKg) || 0}</td>
+                            <td class="num-dec">${Number(r.bjr) || 0}</td>
+                            <td class="curr">${Number(r.hargaPerKg) || 0}</td>
+                            <td class="curr">${Number(r.kotor) || 0}</td>
+                            <td class="curr">${Number(r.ongkos) || 0}</td>
+                            <td class="curr" style="font-weight: bold; color: #166534;">${Number(r.bersih) || 0}</td>
+                            <td class="text-center" style="${Number(r.hilangJjg) > 0 ? 'color: #dc2626; font-weight: bold;' : ''}">${Number(r.hilangJjg) || 0}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                    <tr class="total-row">
+                        <td colspan="2" class="text-center bold">TOTAL PANEN:</td>
+                        <td class="num-int bold">${sumTotalJjg}</td>
+                        <td class="num-int bold">${sumTotalKg}</td>
+                        <td class="num-dec bold">${avgBjr}</td>
+                        <td class="text-center">-</td>
+                        <td class="curr bold">${sumKotor}</td>
+                        <td class="curr bold">${sumOngkosPanen}</td>
+                        <td class="curr bold" style="color: #166534;">${sumKotor - sumOngkosPanen}</td>
+                        <td class="text-center bold" style="color: #dc2626;">${sumHilangJjg}</td>
+                    </tr>
+                `;
+            }
+
+            html += `
+                </table>
+
+                <br/>
+
+                <!-- TABEL 2: BUKU BESAR RINCIAN PERAWATAN & PEMUPUKAN -->
+                <table>
+                    <tr>
+                        <th colspan="7" style="background-color: #2D5A27; font-size: 12pt;">TABEL 2: BUKU BESAR PERAWATAN & PEMUPUKAN KEBUN</th>
+                    </tr>
+                    <tr>
+                        <th style="width: 5%;">No</th>
+                        <th style="width: 22%;">Waktu Pelaksanaan</th>
+                        <th style="width: 25%;">Jenis Pupuk / Perawatan</th>
+                        <th style="width: 16%;">Dosis / Penggunaan</th>
+                        <th style="width: 16%;">Biaya Bahan / Pupuk</th>
+                        <th style="width: 16%;">Upah Pekerja</th>
+                        <th style="width: 18%;">Total Biaya Perawatan</th>
+                    </tr>
+            `;
+
+            if (fertReports.length === 0) {
+                html += `<tr><td colspan="7" class="text-center" style="color: #64748b; padding: 14px;">Belum ada data riwayat perawatan yang dicatat.</td></tr>`;
+            } else {
+                fertReports.forEach((r, idx) => {
+                    const rowClass = idx % 2 === 1 ? 'class="row-alt"' : '';
+                    const dosisStr = r.totalLiterHerbisida ? `${r.totalLiterHerbisida} Liter` : `${r.dosisPohon || 0} / Pohon`;
+                    html += `
+                        <tr ${rowClass}>
+                            <td class="text-center">${idx + 1}</td>
+                            <td class="text-left">${escapeHtml(r.timestamp || '-')}</td>
+                            <td class="text-left bold">${escapeHtml(r.jenis || '-')}</td>
+                            <td class="text-center">${escapeHtml(dosisStr)}</td>
+                            <td class="curr">${Number(r.biayaBahan) || 0}</td>
+                            <td class="curr">${Number(r.biayaKerja) || 0}</td>
+                            <td class="curr bold" style="color: #b45309;">${Number(r.totalBiayaRawat) || 0}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                    <tr class="total-row">
+                        <td colspan="4" class="text-center bold">TOTAL BIAYA PERAWATAN:</td>
+                        <td class="curr bold">${sumBiayaBahan}</td>
+                        <td class="curr bold">${sumBiayaKerja}</td>
+                        <td class="curr bold" style="color: #b45309;">${sumBiayaRawat}</td>
+                    </tr>
+                `;
+            }
+
+            html += `</table>`;
+
+            const dateSlug = new Date().toISOString().slice(0, 10);
+            downloadExcelFile(`Neraca_Keuangan_Sawit_Ku_${dateSlug}.xls`, html);
+        };
+
+        // EXCEL 2: LAPORAN KHUSUS HASIL PANEN
+        window.exportHarvestToExcel = function() {
+            const harvestReports = window.userHarvestData || [];
+            let sumKotor = 0, sumOngkosPanen = 0, sumTotalKg = 0, sumTotalJjg = 0, sumHilangJjg = 0;
+            harvestReports.forEach(r => {
+                sumKotor += Number(r.kotor) || 0;
+                sumOngkosPanen += Number(r.ongkos) || 0;
+                sumTotalKg += Number(r.totalKg) || 0;
+                sumTotalJjg += Number(r.jjg) || 0;
+                sumHilangJjg += Math.max(0, Number(r.hilangJjg) || 0);
+            });
+            const avgBjr = sumTotalJjg > 0 ? (sumTotalKg / sumTotalJjg).toFixed(1) : '0.0';
+            const bio = window.currentBiodata || (window.getSavedPetaniBiodata ? window.getSavedPetaniBiodata() : null) || {};
+            const namaPetani = bio.namaPetani || (window.currentUser && window.currentUser.displayName) || 'Abdul Jalil';
+            const namaKebun = bio.namaKebun || 'Kebun Sawit Mandiri';
+            const exportDate = new Date().toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' });
+
+            let html = `
+                <table>
+                    <tr>
+                        <td colspan="10" class="title-banner">BUKU BESAR HASIL PANEN KELAPA SAWIT (SAWIT-KU)</td>
+                    </tr>
+                    <tr>
+                        <td colspan="10" class="sub-banner">
+                            Diciptakan oleh: <b>Abdul Jalil</b> &bull; Pemilik Kebun: <b>${escapeHtml(namaPetani)}</b> &bull; Kebun: <b>${escapeHtml(namaKebun)}</b> &bull; Tanggal Ekspor: <b>${escapeHtml(exportDate)}</b>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th style="width: 4%;">No</th>
+                        <th style="width: 18%;">Waktu & Tanggal Panen</th>
+                        <th style="width: 10%;">Jumlah Janjang (JJG)</th>
+                        <th style="width: 11%;">Total Berat (Kg)</th>
+                        <th style="width: 8%;">BJR (Kg/JJG)</th>
+                        <th style="width: 11%;">Harga TBS / Kg</th>
+                        <th style="width: 13%;">Hasil Kotor</th>
+                        <th style="width: 12%;">Ongkos Panen</th>
+                        <th style="width: 14%;">Uang Bersih (Nett)</th>
+                        <th style="width: 10%;">Tandan Hilang</th>
+                    </tr>
+            `;
+
+            if (harvestReports.length === 0) {
+                html += `<tr><td colspan="10" class="text-center" style="padding: 16px; color: #64748b;">Belum ada catatan laporan panen.</td></tr>`;
+            } else {
+                harvestReports.forEach((r, idx) => {
+                    const rowClass = idx % 2 === 1 ? 'class="row-alt"' : '';
+                    html += `
+                        <tr ${rowClass}>
+                            <td class="text-center">${idx + 1}</td>
+                            <td class="text-left">${escapeHtml(r.timestamp || '-')}</td>
+                            <td class="num-int">${Number(r.jjg) || 0}</td>
+                            <td class="num-int">${Number(r.totalKg) || 0}</td>
+                            <td class="num-dec">${Number(r.bjr) || 0}</td>
+                            <td class="curr">${Number(r.hargaPerKg) || 0}</td>
+                            <td class="curr">${Number(r.kotor) || 0}</td>
+                            <td class="curr">${Number(r.ongkos) || 0}</td>
+                            <td class="curr" style="font-weight: bold; color: #166534;">${Number(r.bersih) || 0}</td>
+                            <td class="text-center" style="${Number(r.hilangJjg) > 0 ? 'color: #dc2626; font-weight: bold;' : ''}">${Number(r.hilangJjg) || 0}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                    <tr class="total-row">
+                        <td colspan="2" class="text-center bold">TOTAL KESELURUHAN PANEN:</td>
+                        <td class="num-int bold">${sumTotalJjg}</td>
+                        <td class="num-int bold">${sumTotalKg}</td>
+                        <td class="num-dec bold">${avgBjr}</td>
+                        <td class="text-center">-</td>
+                        <td class="curr bold">${sumKotor}</td>
+                        <td class="curr bold">${sumOngkosPanen}</td>
+                        <td class="curr bold" style="color: #166534;">${sumKotor - sumOngkosPanen}</td>
+                        <td class="text-center bold" style="color: #dc2626;">${sumHilangJjg}</td>
+                    </tr>
+                `;
+            }
+
+            html += `</table>`;
+
+            const dateSlug = new Date().toISOString().slice(0, 10);
+            downloadExcelFile(`Laporan_Panen_Sawit_Ku_${dateSlug}.xls`, html);
+        };
+
+        // EXCEL 3: LAPORAN KHUSUS PERAWATAN & PEMUPUKAN
+        window.exportFertilizerToExcel = function() {
+            const fertReports = window.userFertilizerData || [];
+            let sumBiayaBahan = 0, sumBiayaKerja = 0, sumBiayaRawat = 0;
+            fertReports.forEach(r => {
+                sumBiayaBahan += Number(r.biayaBahan) || 0;
+                sumBiayaKerja += Number(r.biayaKerja) || 0;
+                sumBiayaRawat += Number(r.totalBiayaRawat) || 0;
+            });
+            const bio = window.currentBiodata || (window.getSavedPetaniBiodata ? window.getSavedPetaniBiodata() : null) || {};
+            const namaPetani = bio.namaPetani || (window.currentUser && window.currentUser.displayName) || 'Abdul Jalil';
+            const namaKebun = bio.namaKebun || 'Kebun Sawit Mandiri';
+            const exportDate = new Date().toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' });
+
+            let html = `
+                <table>
+                    <tr>
+                        <td colspan="7" class="title-banner">BUKU BESAR PERAWATAN & PEMUPUKAN KEBUN (SAWIT-KU)</td>
+                    </tr>
+                    <tr>
+                        <td colspan="7" class="sub-banner">
+                            Diciptakan oleh: <b>Abdul Jalil</b> &bull; Pemilik Kebun: <b>${escapeHtml(namaPetani)}</b> &bull; Kebun: <b>${escapeHtml(namaKebun)}</b> &bull; Tanggal Ekspor: <b>${escapeHtml(exportDate)}</b>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th style="width: 5%;">No</th>
+                        <th style="width: 20%;">Waktu Pelaksanaan</th>
+                        <th style="width: 25%;">Jenis Pupuk / Perawatan</th>
+                        <th style="width: 16%;">Dosis / Penggunaan</th>
+                        <th style="width: 16%;">Biaya Bahan / Pupuk</th>
+                        <th style="width: 16%;">Upah Pekerja</th>
+                        <th style="width: 18%;">Total Biaya Perawatan</th>
+                    </tr>
+            `;
+
+            if (fertReports.length === 0) {
+                html += `<tr><td colspan="7" class="text-center" style="padding: 16px; color: #64748b;">Belum ada catatan laporan perawatan.</td></tr>`;
+            } else {
+                fertReports.forEach((r, idx) => {
+                    const rowClass = idx % 2 === 1 ? 'class="row-alt"' : '';
+                    const dosisStr = r.totalLiterHerbisida ? `${r.totalLiterHerbisida} Liter` : `${r.dosisPohon || 0} / Pohon`;
+                    html += `
+                        <tr ${rowClass}>
+                            <td class="text-center">${idx + 1}</td>
+                            <td class="text-left">${escapeHtml(r.timestamp || '-')}</td>
+                            <td class="text-left bold">${escapeHtml(r.jenis || '-')}</td>
+                            <td class="text-center">${escapeHtml(dosisStr)}</td>
+                            <td class="curr">${Number(r.biayaBahan) || 0}</td>
+                            <td class="curr">${Number(r.biayaKerja) || 0}</td>
+                            <td class="curr bold" style="color: #b45309;">${Number(r.totalBiayaRawat) || 0}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                    <tr class="total-row">
+                        <td colspan="4" class="text-center bold">TOTAL KESELURUHAN BIAYA RAWAT:</td>
+                        <td class="curr bold">${sumBiayaBahan}</td>
+                        <td class="curr bold">${sumBiayaKerja}</td>
+                        <td class="curr bold" style="color: #b45309;">${sumBiayaRawat}</td>
+                    </tr>
+                `;
+            }
+
+            html += `</table>`;
+
+            const dateSlug = new Date().toISOString().slice(0, 10);
+            downloadExcelFile(`Laporan_Perawatan_Sawit_Ku_${dateSlug}.xls`, html);
+        };
+
+        window.renderHarvestHistory = renderHarvestHistory;
+        window.renderFertilizerHistory = renderFertilizerHistory;
+        window.updateGlobalAnalytics = updateGlobalAnalytics;
+
+        window.onload = function() {
+            const savedBio = window.getSavedPetaniBiodata ? window.getSavedPetaniBiodata() : null;
+            if (savedBio && savedBio.namaPetani) {
+                if (window.applyPetaniBiodataToUI) window.applyPetaniBiodataToUI(savedBio);
+                const uid = savedBio.uid || (window.getOrCreateDeviceUid ? window.getOrCreateDeviceUid() : 'petani_local');
+                if (window.subscribeToUserHarvestReports) window.subscribeToUserHarvestReports(uid);
+                if (window.subscribeToUserFertilizerReports) window.subscribeToUserFertilizerReports(uid);
+            } else {
+                const modal = document.getElementById('biodata-modal');
+                if (modal) modal.classList.remove('hidden');
+                const mainApp = document.getElementById('main-app-content');
+                if (mainApp) mainApp.classList.add('hidden');
+            }
+            init3DCanvas();
+            updateSimulation();
+            startRealtimeClock();
+            initGPSWeather();
+            updateFertilizerGuidance();
+            updateAudioMuteUI();
+            if (typeof window.updateConnectionStatus === 'function') {
+                window.updateConnectionStatus(navigator.onLine);
+            }
+            if (window.userHarvestData) {
+                renderHarvestHistory(window.userHarvestData);
+            }
+            if (window.userFertilizerData) {
+                renderFertilizerHistory(window.userFertilizerData);
+            }
+            updateGlobalAnalytics();
+        };
+    </script>
+</body>
+</html>
